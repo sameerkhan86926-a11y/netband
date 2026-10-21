@@ -1,6 +1,6 @@
 /* =========================================
    NETBAND — PREMIUM RESPONSIVE UI
-   File: style.css
+   File: style.css (Refined & Production Ready)
 ========================================= */
 
 :root {
@@ -28,16 +28,14 @@
   --radius-md: 16px;
   --radius-lg: 24px;
 
-  --shadow:
-    0 20px 60px rgba(0, 0, 0, 0.28);
-
-  --gradient:
-    linear-gradient(135deg, #7c5cff, #21b8ff);
-
+  --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  --gradient: linear-gradient(135deg, #7c5cff, #21b8ff);
   --transition: 180ms ease;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -48,20 +46,12 @@ html {
 
 body {
   min-height: 100vh;
+  min-height: 100dvh; /* Mobile viewport bar fix */
   margin: 0;
   background:
-    radial-gradient(
-      ellipse at 15% 0%,
-      rgba(124, 92, 255, 0.13),
-      transparent 40%
-    ),
-    radial-gradient(
-      ellipse at 90% 20%,
-      rgba(33, 212, 253, 0.08),
-      transparent 35%
-    ),
+    radial-gradient(ellipse at 15% 0%, rgba(124, 92, 255, 0.13), transparent 45%),
+    radial-gradient(ellipse at 90% 20%, rgba(33, 212, 253, 0.08), transparent 40%),
     var(--bg);
-
   color: var(--text);
   font-family:
     Inter,
@@ -70,50 +60,66 @@ body {
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
+    Roboto,
     sans-serif;
-
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
 input,
 textarea {
   font: inherit;
+  color: inherit;
 }
 
 button {
+  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    transform var(--transition),
+    background var(--transition),
+    border-color var(--transition),
+    box-shadow var(--transition),
+    filter var(--transition);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible {
   outline: 2px solid var(--secondary);
-  outline-offset: 3px;
-}
-
-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-button,
-a {
-  touch-action: manipulation;
+  outline-offset: 2px;
 }
 
 a {
   color: var(--primary-light);
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 
 ::selection {
   background: rgba(124, 92, 255, 0.4);
-  color: white;
+  color: #fff;
 }
 
 /* =========================================
-   MAIN LAYOUT
+   LAYOUT & CONTAINER
 ========================================= */
 
 .app-container,
@@ -134,14 +140,11 @@ header,
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-}
-
-header {
   padding: 22px 0;
 }
 
 main {
-  padding-bottom: 48px;
+  padding-bottom: clamp(32px, 5vw, 48px);
 }
 
 section {
@@ -161,26 +164,23 @@ section {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
   color: var(--text);
-  font-weight: 850;
-  font-size: 21px;
-  letter-spacing: -0.7px;
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: -0.5px;
 }
 
 .logo-icon,
 .brand-icon {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   background: var(--gradient);
   color: #fff;
-
-  box-shadow:
-    0 8px 28px rgba(124, 92, 255, 0.3);
+  box-shadow: 0 8px 24px rgba(124, 92, 255, 0.35);
 }
 
 .logo span,
@@ -192,7 +192,7 @@ section {
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 1.4px;
+  letter-spacing: 1.2px;
   text-transform: uppercase;
 }
 
@@ -202,32 +202,33 @@ section {
 
 .hero {
   max-width: 780px;
-  margin: 50px auto 38px;
+  margin: 48px auto 36px;
   text-align: center;
 }
 
 .hero h1 {
   margin: 0;
-  font-size: clamp(36px, 7vw, 68px);
+  font-size: clamp(32px, 6.5vw, 64px);
   font-weight: 900;
-  letter-spacing: -2.8px;
-  line-height: 1.06;
+  letter-spacing: -2px;
+  line-height: 1.1;
 }
 
 .hero h1 span,
 .gradient-text {
-  color: transparent;
   background: var(--gradient);
-  background-clip: text;
   -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: inline-block;
 }
 
 .hero p {
   max-width: 580px;
-  margin: 20px auto 0;
+  margin: 18px auto 0;
   color: var(--muted);
-  font-size: 16px;
-  line-height: 1.8;
+  font-size: clamp(14px, 2vw, 16px);
+  line-height: 1.7;
 }
 
 .hero-badge,
@@ -235,31 +236,27 @@ section {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-
   margin-bottom: 20px;
-  padding: 8px 13px;
-
+  padding: 6px 14px;
   border: 1px solid var(--border);
   border-radius: 999px;
-
   background: rgba(124, 92, 255, 0.08);
   color: #c5baff;
-
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .hero-badge::before {
   content: "";
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--success);
-  box-shadow: 0 0 12px rgba(54, 229, 162, 0.65);
+  box-shadow: 0 0 10px rgba(54, 229, 162, 0.7);
 }
 
 /* =========================================
-   PANELS AND CARDS
+   PANELS & CARDS
 ========================================= */
 
 .panel,
@@ -268,15 +265,10 @@ section {
 #chatPanel {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-
-  background:
-    linear-gradient(
-      145deg,
-      rgba(20, 28, 48, 0.96),
-      rgba(12, 17, 30, 0.96)
-    );
-
+  background: linear-gradient(145deg, rgba(20, 28, 48, 0.95), rgba(12, 17, 30, 0.98));
   box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 #setupPanel {
@@ -289,21 +281,22 @@ section {
 .panel h2,
 .card h2 {
   margin: 0 0 10px;
-  font-size: 23px;
+  font-size: 22px;
   font-weight: 800;
-  letter-spacing: -0.6px;
+  letter-spacing: -0.5px;
 }
 
 #setupPanel p,
 .panel-description {
+  margin: 0;
   color: var(--muted);
   font-size: 14px;
-  line-height: 1.7;
+  line-height: 1.6;
 }
 
 .setup-options {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, 1fr);
   gap: 14px;
   margin-top: 24px;
 }
@@ -316,40 +309,43 @@ section {
 }
 
 .feature-card h3 {
-  margin: 10px 0 5px;
+  margin: 12px 0 6px;
   font-size: 15px;
+  font-weight: 700;
 }
 
 .feature-card p {
   margin: 0;
+  color: var(--muted);
   font-size: 12px;
+  line-height: 1.5;
 }
 
 .feature-icon {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 13px;
-  background: rgba(124, 92, 255, 0.14);
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(124, 92, 255, 0.15);
   font-size: 20px;
 }
 
 /* =========================================
-   INPUTS
+   INPUTS (iOS Zoom Fix Included)
 ========================================= */
 
 .input-group {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 17px;
+  margin-bottom: 18px;
 }
 
 label {
   color: #c6cde1;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 input,
@@ -357,12 +353,11 @@ textarea {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--border);
-  border-radius: 13px;
+  border-radius: 12px;
   outline: none;
-
   background: rgba(5, 9, 19, 0.75);
   color: var(--text);
-
+  font-size: 16px; /* iOS auto-zoom bypass */
   transition:
     border-color var(--transition),
     box-shadow var(--transition),
@@ -370,13 +365,13 @@ textarea {
 }
 
 input {
-  min-height: 49px;
-  padding: 12px 15px;
+  min-height: 48px;
+  padding: 10px 14px;
 }
 
 textarea {
   min-height: 90px;
-  padding: 13px 15px;
+  padding: 12px 14px;
   resize: vertical;
 }
 
@@ -387,38 +382,25 @@ textarea::placeholder {
 
 input:hover,
 textarea:hover {
-  border-color: rgba(157, 172, 215, 0.3);
+  border-color: rgba(157, 172, 215, 0.35);
 }
 
 input:focus,
 textarea:focus {
   border-color: var(--primary);
   background: rgba(8, 12, 24, 0.95);
-  box-shadow: 0 0 0 4px rgba(124, 92, 255, 0.11);
+  box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.18);
 }
 
 #roomInput {
   text-transform: uppercase;
   letter-spacing: 2px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 /* =========================================
    BUTTONS
 ========================================= */
-
-button {
-  cursor: pointer;
-  transition:
-    transform var(--transition),
-    background var(--transition),
-    border-color var(--transition),
-    box-shadow var(--transition);
-}
-
-button:active:not(:disabled) {
-  transform: scale(0.97);
-}
 
 .btn,
 button.primary,
@@ -427,30 +409,23 @@ button.primary,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-
+  gap: 8px;
   min-height: 46px;
-  padding: 12px 19px;
-
+  padding: 12px 20px;
   border: 1px solid transparent;
-  border-radius: 13px;
-
+  border-radius: 12px;
   background: var(--gradient);
   color: #fff;
-
   font-size: 14px;
-  font-weight: 800;
-
-  box-shadow:
-    0 8px 22px rgba(124, 92, 255, 0.17);
+  font-weight: 700;
+  box-shadow: 0 8px 20px rgba(124, 92, 255, 0.2);
 }
 
 .btn:hover,
 button.primary:hover,
 #createBtn:hover,
 #sendBtn:hover {
-  box-shadow:
-    0 10px 30px rgba(124, 92, 255, 0.3);
+  box-shadow: 0 10px 26px rgba(124, 92, 255, 0.35);
   filter: brightness(1.08);
 }
 
@@ -462,18 +437,14 @@ button.secondary,
   align-items: center;
   justify-content: center;
   gap: 8px;
-
-  min-height: 42px;
-  padding: 10px 14px;
-
+  min-height: 40px;
+  padding: 8px 14px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-
-  background: rgba(255, 255, 255, 0.035);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text);
-
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .btn-secondary:hover,
@@ -487,20 +458,24 @@ button.secondary:hover,
 .btn-danger,
 #leaveBtn,
 #leaveCallBtn {
-  border: 1px solid rgba(255, 85, 119, 0.25);
-  border-radius: 12px;
-
-  background: rgba(255, 85, 119, 0.09);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 85, 119, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 85, 119, 0.08);
   color: #ff8ba2;
-
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .btn-danger:hover,
 #leaveBtn:hover,
 #leaveCallBtn:hover {
-  background: rgba(255, 85, 119, 0.17);
+  background: rgba(255, 85, 119, 0.18);
 }
 
 #createBtn,
@@ -509,11 +484,11 @@ button.secondary:hover,
 }
 
 #joinForm {
-  margin-top: 22px;
+  margin-top: 20px;
 }
 
 #joinForm button {
-  margin-top: 5px;
+  margin-top: 6px;
 }
 
 button svg,
@@ -522,14 +497,14 @@ button svg,
 }
 
 /* =========================================
-   ERRORS AND STATUS
+   STATUS & ERRORS
 ========================================= */
 
 .error,
 #setupError,
 #chatError,
 #callError {
-  margin-top: 12px;
+  margin-top: 10px;
   color: #ff8399;
   font-size: 13px;
   overflow-wrap: anywhere;
@@ -549,10 +524,9 @@ button svg,
   width: 8px;
   height: 8px;
   margin-right: 6px;
-
   border-radius: 50%;
   background: var(--success);
-  box-shadow: 0 0 10px rgba(54, 229, 162, 0.4);
+  box-shadow: 0 0 8px rgba(54, 229, 162, 0.6);
 }
 
 #networkLabel {
@@ -575,23 +549,21 @@ button svg,
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-
-  padding: 21px 24px;
+  padding: 18px 24px;
   border-bottom: 1px solid var(--border);
-
   background: rgba(255, 255, 255, 0.015);
 }
 
 .chat-header h2,
 #chatTitle {
   margin: 0;
-  font-size: 19px;
-  font-weight: 850;
+  font-size: 18px;
+  font-weight: 800;
   overflow-wrap: anywhere;
 }
 
 .chat-header p {
-  margin: 5px 0 0;
+  margin: 4px 0 0;
   color: var(--muted);
   font-size: 12px;
 }
@@ -607,21 +579,19 @@ button svg,
 #roomCodeDisplay {
   display: inline-block;
   max-width: 100%;
-  padding: 5px 9px;
-
+  padding: 5px 10px;
   border: 1px dashed rgba(124, 92, 255, 0.45);
   border-radius: 8px;
-
   color: #c7baff;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-weight: 850;
+  font-weight: 700;
   letter-spacing: 1.5px;
-
+  user-select: all;
   overflow-wrap: anywhere;
 }
 
 /* =========================================
-   ROOM SHARE AND EXPIRY
+   SHARE & EXPIRY BARS
 ========================================= */
 
 .room-share,
@@ -630,8 +600,7 @@ button svg,
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-
-  padding: 14px 22px;
+  padding: 12px 22px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -641,17 +610,17 @@ button svg,
 
 .expiry-panel,
 .room-expiry {
-  padding: 14px 22px;
+  padding: 12px 22px;
   border-bottom: 1px solid var(--border);
 }
 
 .expiry-title,
 #expiryTitle {
   display: block;
-  margin-bottom: 9px;
+  margin-bottom: 8px;
   color: #bdc7df;
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 #expiryBar {
@@ -666,6 +635,7 @@ button svg,
   height: 100%;
   border-radius: inherit;
   background: var(--gradient);
+  transition: width 300ms ease;
 }
 
 /* =========================================
@@ -673,7 +643,7 @@ button svg,
 ========================================= */
 
 .call-panel {
-  padding: 22px;
+  padding: 18px 22px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -683,12 +653,13 @@ button svg,
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .call-header h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .call-controls,
@@ -696,24 +667,21 @@ button svg,
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 9px;
+  gap: 8px;
 }
 
 #joinVoiceBtn,
 #joinVideoBtn,
 #muteBtn,
 #cameraBtn {
-  min-height: 42px;
-  padding: 10px 13px;
-
+  min-height: 38px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.045);
   color: var(--text);
-
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 #joinVoiceBtn:hover,
@@ -731,28 +699,21 @@ button svg,
 
 #videoGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
 .video-tile,
 .participant-video {
   position: relative;
   min-width: 0;
-  min-height: 170px;
+  min-height: 160px;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
-
   border: 1px solid var(--border);
-  border-radius: 17px;
-
-  background:
-    radial-gradient(
-      circle at 50% 30%,
-      rgba(124, 92, 255, 0.14),
-      transparent 65%
-    ),
-    #080c17;
+  border-radius: var(--radius-md);
+  background: radial-gradient(circle at 50% 30%, rgba(124, 92, 255, 0.14), transparent 65%), #080c17;
 }
 
 .video-tile video,
@@ -760,7 +721,6 @@ button svg,
   display: block;
   width: 100%;
   height: 100%;
-  min-height: 170px;
   object-fit: cover;
 }
 
@@ -772,26 +732,23 @@ button svg,
 .video-tile .participant-name,
 .video-tile .video-label {
   position: absolute;
-  right: 10px;
-  bottom: 10px;
-  left: 10px;
-
-  padding: 7px 10px;
-  border-radius: 9px;
-
-  background: rgba(5, 8, 15, 0.72);
-  color: white;
-
-  font-size: 12px;
-  font-weight: 750;
+  right: 8px;
+  bottom: 8px;
+  left: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(5, 8, 15, 0.75);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 #videoEmpty {
-  padding: 25px 15px;
+  padding: 24px 16px;
   border: 1px dashed var(--border);
-  border-radius: 15px;
-
+  border-radius: var(--radius-md);
   color: var(--muted);
   text-align: center;
   font-size: 13px;
@@ -801,54 +758,49 @@ button svg,
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 13px;
+  margin-top: 12px;
 }
 
 .participant,
 .participant-item {
-  padding: 7px 11px;
+  padding: 6px 12px;
   border: 1px solid var(--border);
   border-radius: 999px;
-
   background: rgba(255, 255, 255, 0.035);
   color: #c9d1e8;
-
   font-size: 12px;
 }
 
 /* =========================================
-   MESSAGE SEARCH
+   SEARCH
 ========================================= */
 
 .search-box,
 .message-search {
   position: relative;
-  padding: 15px 22px;
+  padding: 12px 22px;
   border-bottom: 1px solid var(--border);
 }
 
 #messageSearch {
-  min-height: 43px;
-  padding: 10px 13px;
+  min-height: 40px;
+  padding: 8px 12px;
   font-size: 13px;
 }
 
 /* =========================================
-   MESSAGES
+   MESSAGES LIST
 ========================================= */
 
 #chatMessages {
   display: flex;
   flex-direction: column;
-  gap: 13px;
-
-  min-height: 230px;
-  max-height: 470px;
-  padding: 22px;
-
+  gap: 12px;
+  min-height: 250px;
+  max-height: 520px;
+  padding: 20px;
   overflow-y: auto;
   overflow-x: hidden;
-
   scrollbar-width: thin;
   scrollbar-color: #35405e transparent;
 }
@@ -866,14 +818,11 @@ button svg,
 .chat-message {
   position: relative;
   width: fit-content;
-  max-width: min(82%, 620px);
-  min-width: 110px;
-
+  max-width: min(85%, 620px);
+  min-width: 100px;
   padding: 12px 14px;
-
   border: 1px solid var(--border);
-  border-radius: 16px 16px 16px 5px;
-
+  border-radius: 16px 16px 16px 4px;
   background: rgba(255, 255, 255, 0.04);
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -883,32 +832,25 @@ button svg,
 .chat-message.own,
 .message.mine {
   align-self: flex-end;
-
-  border-color: rgba(124, 92, 255, 0.24);
-  border-radius: 16px 16px 5px 16px;
-
-  background:
-    linear-gradient(
-      135deg,
-      rgba(124, 92, 255, 0.19),
-      rgba(33, 184, 255, 0.07)
-    );
+  border-color: rgba(124, 92, 255, 0.3);
+  border-radius: 16px 16px 4px 16px;
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.22), rgba(33, 184, 255, 0.08));
 }
 
 .message-sender,
 .sender-name {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
   color: var(--primary-light);
   font-size: 11px;
-  font-weight: 850;
+  font-weight: 700;
 }
 
 .message-body,
 .message-text {
   color: #eef1ff;
   font-size: 14px;
-  line-height: 1.7;
+  line-height: 1.6;
   white-space: pre-wrap;
 }
 
@@ -916,7 +858,7 @@ button svg,
 .message-meta,
 .message small {
   display: block;
-  margin-top: 8px;
+  margin-top: 6px;
   color: var(--muted);
   font-size: 10px;
 }
@@ -925,28 +867,25 @@ button svg,
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 9px;
+  margin-top: 8px;
 }
 
 .message-actions button,
 .message-action {
-  min-height: 29px;
-  padding: 5px 8px;
-
+  min-height: 26px;
+  padding: 4px 8px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-
-  background: rgba(255, 255, 255, 0.035);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
   color: #bdc7df;
-
   font-size: 10px;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .message-actions button:hover,
 .message-action:hover {
-  background: rgba(124, 92, 255, 0.15);
-  color: white;
+  background: rgba(124, 92, 255, 0.18);
+  color: #fff;
 }
 
 .message-edited {
@@ -956,21 +895,18 @@ button svg,
 
 .reply-quote,
 .message-reply {
-  margin-bottom: 9px;
-  padding: 8px 10px;
-
+  margin-bottom: 8px;
+  padding: 6px 10px;
   border-left: 3px solid var(--primary);
-  border-radius: 5px;
-
-  background: rgba(124, 92, 255, 0.09);
+  border-radius: 4px;
+  background: rgba(124, 92, 255, 0.1);
   color: #c9c1ff;
-
   font-size: 12px;
   overflow-wrap: anywhere;
 }
 
 /* =========================================
-   REPLY PREVIEW
+   REPLY COMPOSER
 ========================================= */
 
 #replyComposerPreview,
@@ -979,13 +915,10 @@ button svg,
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-
-  margin: 0 22px 12px;
-  padding: 11px 13px;
-
-  border: 1px solid rgba(124, 92, 255, 0.3);
-  border-radius: 12px;
-
+  margin: 0 20px 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(124, 92, 255, 0.35);
+  border-radius: 10px;
   background: rgba(124, 92, 255, 0.08);
 }
 
@@ -998,14 +931,11 @@ button svg,
 
 #cancelReplyBtn {
   flex-shrink: 0;
-  padding: 5px 9px;
-
+  padding: 4px 8px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-
+  border-radius: 6px;
   background: transparent;
   color: var(--text);
-
   font-size: 11px;
 }
 
@@ -1017,26 +947,23 @@ button svg,
   display: flex;
   align-items: flex-end;
   gap: 10px;
-
-  padding: 17px 22px 22px;
+  padding: 16px 20px 20px;
   border-top: 1px solid var(--border);
-
   background: rgba(255, 255, 255, 0.012);
 }
 
 #messageInput {
   flex: 1;
-  min-height: 47px;
+  min-height: 46px;
   max-height: 140px;
-  resize: vertical;
-
-  padding: 13px 15px;
+  padding: 11px 14px;
   font-size: 14px;
 }
 
 #sendBtn {
   flex-shrink: 0;
-  min-width: 85px;
+  min-width: 80px;
+  height: 46px;
 }
 
 .composer-tools,
@@ -1054,19 +981,15 @@ button svg,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-
-  min-height: 43px;
-  padding: 10px 12px;
-
+  gap: 6px;
+  min-height: 42px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.035);
   color: #cbd3ea;
-
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 #attachmentBtn:hover,
@@ -1081,24 +1004,24 @@ button svg,
 }
 
 .attachment-note {
-  padding: 0 22px 14px;
+  padding: 0 20px 12px;
   color: var(--muted);
   font-size: 11px;
 }
 
 /* =========================================
-   REACTIONS AND FILES
+   REACTIONS & FILES
 ========================================= */
 
 .reaction-list {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .reaction {
-  padding: 4px 8px;
+  padding: 3px 8px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
@@ -1109,24 +1032,20 @@ button svg,
   display: flex;
   align-items: center;
   gap: 12px;
-
   margin-top: 8px;
-  padding: 12px;
-
+  padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.035);
 }
 
 .file-icon {
   display: grid;
   place-items: center;
-  width: 39px;
-  height: 39px;
+  width: 38px;
+  height: 38px;
   flex-shrink: 0;
-
-  border-radius: 11px;
+  border-radius: 10px;
   background: rgba(124, 92, 255, 0.15);
 }
 
@@ -1136,7 +1055,7 @@ button svg,
 
 .file-name {
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
@@ -1152,10 +1071,8 @@ button svg,
 footer {
   width: min(1050px, calc(100% - 32px));
   margin: 28px auto 0;
-  padding: 20px 0;
-
+  padding: 20px 0 calc(20px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--border);
-
   color: var(--muted);
   text-align: center;
   font-size: 11px;
@@ -1173,9 +1090,8 @@ footer strong {
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(7px);
+    transform: translateY(6px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1183,11 +1099,9 @@ footer strong {
 }
 
 @keyframes pulse {
-  0%,
-  100% {
+  0%, 100% {
     opacity: 1;
   }
-
   50% {
     opacity: 0.45;
   }
@@ -1205,21 +1119,17 @@ footer strong {
 }
 
 /* =========================================
-   TABLET
+   TABLET RESPONSIVENESS
 ========================================= */
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .hero {
-    margin-top: 34px;
-  }
-
-  .hero h1 {
-    letter-spacing: -1.8px;
+    margin-top: 32px;
   }
 
   .chat-header {
     align-items: flex-start;
-    padding: 18px;
+    padding: 16px;
   }
 
   .header-actions,
@@ -1228,12 +1138,12 @@ footer strong {
   }
 
   .call-panel {
-    padding: 18px;
+    padding: 16px;
   }
 
   #chatMessages {
-    max-height: 430px;
-    padding: 17px;
+    max-height: 440px;
+    padding: 16px;
   }
 
   .search-box,
@@ -1242,26 +1152,25 @@ footer strong {
   .share-panel,
   .expiry-panel,
   .room-expiry {
-    padding-right: 17px;
-    padding-left: 17px;
+    padding-inline: 16px;
   }
 
   #messageForm {
-    padding: 15px 17px 18px;
+    padding: 14px 16px 16px;
   }
 }
 
 /* =========================================
-   MOBILE
+   MOBILE RESPONSIVENESS
 ========================================= */
 
-@media (max-width: 520px) {
+@media (max-width: 540px) {
   .container {
-    width: calc(100% - 22px);
+    width: calc(100% - 24px);
   }
 
   header {
-    padding: 15px 0;
+    padding: 14px 0;
   }
 
   .logo,
@@ -1271,89 +1180,57 @@ footer strong {
 
   .logo-icon,
   .brand-icon {
-    width: 37px;
-    height: 37px;
-    border-radius: 12px;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
   }
 
   .hero {
-    margin: 28px auto 25px;
+    margin: 24px auto 20px;
   }
 
   .hero h1 {
-    font-size: clamp(34px, 10vw, 48px);
-    letter-spacing: -1.7px;
-  }
-
-  .hero p {
-    margin-top: 13px;
-    font-size: 13px;
+    font-size: clamp(30px, 9vw, 42px);
+    letter-spacing: -1.2px;
   }
 
   #setupPanel {
     padding: 20px 16px;
-    border-radius: 19px;
-  }
-
-  #setupPanel h2 {
-    font-size: 21px;
+    border-radius: var(--radius-md);
   }
 
   .setup-options {
     grid-template-columns: 1fr;
   }
 
-  .feature-card {
-    padding: 14px;
-  }
-
   #chatPanel {
-    border-radius: 18px;
+    border-radius: var(--radius-md);
   }
 
   .chat-header {
     flex-direction: column;
-    gap: 13px;
-    padding: 16px;
-  }
-
-  .chat-header h2,
-  #chatTitle {
-    font-size: 17px;
+    gap: 12px;
+    padding: 14px;
   }
 
   .header-actions,
   .room-actions {
     width: 100%;
-    justify-content: flex-start;
+    justify-content: stretch;
   }
 
   .header-actions button,
   .room-actions button {
-    flex: 1 1 auto;
-  }
-
-  #roomCodeDisplay {
-    font-size: 12px;
-  }
-
-  .room-share,
-  .share-panel {
-    padding: 12px;
-  }
-
-  .expiry-panel,
-  .room-expiry {
-    padding: 12px;
+    flex: 1;
   }
 
   .call-panel {
-    padding: 14px 12px;
+    padding: 14px;
   }
 
   .call-header {
-    align-items: flex-start;
     flex-direction: column;
+    align-items: flex-start;
   }
 
   .call-controls,
@@ -1363,46 +1240,24 @@ footer strong {
 
   .call-controls button,
   .call-actions button {
-    flex: 1 1 auto;
+    flex: 1;
   }
 
   #videoGrid {
     grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .video-tile,
-  .participant-video {
-    min-height: 190px;
-  }
-
-  .video-tile video,
-  .participant-video video {
-    min-height: 190px;
   }
 
   #chatMessages {
-    min-height: 200px;
-    max-height: 390px;
-    gap: 11px;
-    padding: 14px 11px;
+    min-height: 220px;
+    max-height: 380px;
+    gap: 10px;
+    padding: 12px;
   }
 
   .message,
   .chat-message {
-    max-width: 91%;
-    min-width: 90px;
-    padding: 10px 11px;
-  }
-
-  .message-body,
-  .message-text {
-    font-size: 13px;
-  }
-
-  .search-box,
-  .message-search {
-    padding: 12px;
+    max-width: 90%;
+    padding: 10px 12px;
   }
 
   #replyComposerPreview,
@@ -1414,19 +1269,18 @@ footer strong {
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 8px;
-    padding: 12px;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
   }
 
   #messageInput {
-    min-width: 0;
-    min-height: 45px;
-    font-size: 16px;
+    font-size: 16px; /* Mobile Safari zoom disable */
+    min-height: 44px;
   }
 
   #sendBtn {
-    min-width: 65px;
-    min-height: 45px;
-    padding: 10px;
+    min-width: 60px;
+    height: 44px;
+    padding: 0 12px;
   }
 
   .composer-tools,
@@ -1438,17 +1292,12 @@ footer strong {
   #attachmentBtn,
   #voiceMessageBtn,
   .tool-button {
-    flex: 1 1 auto;
-    min-height: 40px;
-    padding: 9px;
+    flex: 1;
+    min-height: 38px;
   }
 
   .attachment-note {
-    padding: 0 12px 12px;
-  }
-
-  footer {
-    width: calc(100% - 24px);
+    padding: 0 12px 10px;
   }
 }
 
@@ -1464,93 +1313,5 @@ footer strong {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-}
-/* =========================================
-   NETBAND LAYOUT HOTFIX
-========================================= */
-
-/* Prevent unwanted horizontal overflow */
-html,
-body {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
-#setupPanel,
-#chatPanel {
-  box-sizing: border-box;
-  min-width: 0;
-}
-
-/* Restore message form to a single horizontal row */
-#messageForm {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-end;
-  flex-wrap: nowrap;
-  width: 100%;
-}
-
-#messageInput {
-  flex: 1 1 0;
-  width: 0;
-  min-width: 0;
-}
-
-#sendBtn {
-  flex: 0 0 auto;
-  width: auto;
-}
-
-/* Keep buttons from stretching unexpectedly */
-#messageForm button {
-  width: auto;
-}
-
-/* Keep video tiles inside the chat panel */
-#videoGrid {
-  width: 100%;
-  min-width: 0;
-}
-
-.video-tile,
-.participant-video {
-  min-width: 0;
-}
-
-/* Fix mobile spacing */
-@media (max-width: 520px) {
-  #chatPanel {
-    width: 100%;
-    border-radius: 16px;
-  }
-
-  #messageForm {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 12px;
-  }
-
-  #messageInput {
-    flex: 1 1 65%;
-    width: auto;
-  }
-
-  #sendBtn {
-    flex: 0 0 auto;
-    min-width: 65px;
-  }
-
-  #chatMessages {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .chat-header {
-    min-width: 0;
   }
 }

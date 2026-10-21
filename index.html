@@ -2,16 +2,113 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#08111f">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080d18">
+  <meta name="description" content="NETBAND — temporary chat and voice/video calling rooms.">
+  <meta name="color-scheme" content="dark">
 
-  <title>NETBAND 2.1 — Chat & Calls</title>
-
-  <meta name="description"
-    content="NETBAND temporary chat and voice/video calling rooms.">
+  <title>NETBAND 3.0 — Chat & Calls</title>
 
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
+
+  <style>
+    .extra-tools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 14px 0;
+    }
+
+    .tool-button {
+      min-height: 38px;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      background: rgba(255,255,255,.035);
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .tool-button:hover {
+      border-color: var(--primary);
+      background: rgba(139,124,255,.1);
+    }
+
+    .search-box {
+      width: 100%;
+      min-width: 0;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      background: rgba(4,9,19,.6);
+      outline: none;
+    }
+
+    .attachment-note {
+      margin: 8px 0;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.7;
+    }
+
+    .feature-divider {
+      height: 1px;
+      margin: 18px 0;
+      background: var(--border);
+    }
+
+    .message-tools {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .message-tools .tool-button {
+      flex: 0 0 auto;
+    }
+
+    .room-share {
+      overflow-wrap: anywhere;
+      color: var(--cyan);
+    }
+
+    .composer input[type="text"] {
+      flex: 1;
+    }
+
+    .composer-extra {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .composer-extra button {
+      min-height: 35px;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      color: var(--muted);
+      background: rgba(255,255,255,.025);
+      font-size: 10px;
+    }
+
+    .composer-extra button:hover {
+      color: var(--text);
+      border-color: var(--primary);
+    }
+
+    @media (max-width: 480px) {
+      .extra-tools > button {
+        flex: 1 1 auto;
+      }
+    }
+  </style>
 </head>
 
 <body>
@@ -19,7 +116,7 @@
   <div class="ambient ambient-two"></div>
 
   <header class="topbar">
-    <a class="brand" href="./">
+    <a class="brand" href="./" aria-label="NETBAND Home">
       <span class="brand-mark">N</span>
       <span class="brand-name">
         NETBAND
@@ -34,7 +131,6 @@
   </header>
 
   <main class="shell">
-
     <section class="hero">
       <div class="eyebrow">
         <span class="pulse"></span>
@@ -44,8 +140,8 @@
       <h1>Your space.<br><span>Your conversation.</span></h1>
 
       <p>
-        Create a room, share its code, and start chatting
-        or calling without creating an account.
+        Create a room, share its code, and start chatting or calling
+        without creating an account.
       </p>
 
       <div class="hero-pills">
@@ -56,32 +152,28 @@
       </div>
     </section>
 
+    <!-- CREATE OR JOIN -->
     <section class="panel setup-panel" id="setupPanel">
-
       <div class="panel-heading">
         <div>
           <span class="step">01 / CONNECT</span>
           <h2>Start a temporary room</h2>
         </div>
-
         <span class="lock-icon">⌑</span>
       </div>
 
       <p class="muted">
-        Create a new room or join an existing room using its code.
+        Create a room or join an existing room using its code.
       </p>
 
       <button id="createBtn" class="button primary" type="button">
         ＋ Create room
       </button>
 
-      <div class="divider">
-        <span>OR JOIN A ROOM</span>
-      </div>
+      <div class="divider"><span>OR JOIN A ROOM</span></div>
 
       <form id="joinForm" class="join-row">
         <label class="sr-only" for="roomInput">Room code</label>
-
         <input
           id="roomInput"
           maxlength="8"
@@ -91,17 +183,14 @@
           placeholder="ENTER ROOM CODE"
           required
         >
-
-        <button class="button secondary" type="submit">
-          Join room ↗
-        </button>
+        <button class="button secondary" type="submit">Join room ↗</button>
       </form>
 
       <p id="setupError" class="error" aria-live="polite"></p>
     </section>
 
+    <!-- ACTIVE ROOM -->
     <section class="panel chat-panel hidden" id="chatPanel">
-
       <div class="chat-top">
         <div>
           <span class="step">02 / LIVE ROOM</span>
@@ -110,12 +199,7 @@
           <div class="room-meta">
             CODE
             <strong id="roomCodeDisplay">--------</strong>
-
-            <button
-              id="copyCodeBtn"
-              class="text-button"
-              type="button"
-            >
+            <button id="copyCodeBtn" class="text-button" type="button">
               Copy code
             </button>
           </div>
@@ -126,6 +210,15 @@
         </button>
       </div>
 
+      <div class="extra-tools">
+        <button id="shareRoomBtn" class="tool-button" type="button">
+          🔗 Share room
+        </button>
+      </div>
+
+      <p id="roomShareStatus" class="attachment-note" aria-live="polite"></p>
+
+      <!-- ROOM EXPIRY -->
       <div class="expiry">
         <span>◷</span>
 
@@ -139,89 +232,54 @@
         </div>
       </div>
 
-      <!-- VOICE AND VIDEO CALLING -->
-
+      <!-- VOICE AND VIDEO -->
       <section class="call-panel">
-
         <div class="call-heading">
           <div>
             <span class="step">03 / LIVE CALL</span>
             <h3>Voice & video</h3>
           </div>
 
-          <span id="callStatus" class="call-status">
-            Not in a call
-          </span>
+          <span id="callStatus" class="call-status">Not in a call</span>
         </div>
 
         <p class="call-help">
-          Start a voice or video call with people in this room.
-          Allow microphone or camera access when prompted.
+          Join the call to speak with other room participants.
+          Microphone and camera permissions may be required.
         </p>
 
         <div class="call-actions">
-
-          <button
-            id="joinVoiceBtn"
-            class="button primary"
-            type="button"
-          >
+          <button id="joinVoiceBtn" class="button primary" type="button">
             🎙 Join voice
           </button>
 
-          <button
-            id="joinVideoBtn"
-            class="button secondary"
-            type="button"
-          >
+          <button id="joinVideoBtn" class="button secondary" type="button">
             🎥 Join video
           </button>
 
-          <button
-            id="muteBtn"
-            class="button ghost"
-            type="button"
-            disabled
-          >
+          <button id="muteBtn" class="button ghost" type="button" disabled>
             Mute mic
           </button>
 
-          <button
-            id="cameraBtn"
-            class="button ghost"
-            type="button"
-            disabled
-          >
+          <button id="cameraBtn" class="button ghost" type="button" disabled>
             Turn camera on
           </button>
 
-          <button
-            id="leaveCallBtn"
-            class="button danger"
-            type="button"
-            disabled
-          >
+          <button id="leaveCallBtn" class="button danger" type="button" disabled>
             Leave call
           </button>
-
         </div>
 
         <div class="call-layout">
-
           <div id="videoGrid" class="video-grid">
-
             <div id="videoEmpty" class="video-empty">
               <span>◉</span>
               <strong>No active call</strong>
-              <small>
-                Join voice or video to connect with room members.
-              </small>
+              <small>Join voice or video to connect with room members.</small>
             </div>
-
           </div>
 
           <aside class="participants-panel">
-
             <div class="participants-title">
               Participants
               <span id="participantCount">0</span>
@@ -230,17 +288,28 @@
             <div id="participantList" class="participant-list">
               <p class="muted small">No participants yet.</p>
             </div>
-
           </aside>
-
         </div>
 
         <p id="callError" class="error" aria-live="polite"></p>
-
       </section>
 
-      <!-- CHAT MESSAGES -->
+      <!-- CHAT SEARCH -->
+      <section aria-label="Message search">
+        <label class="sr-only" for="messageSearch">Search messages</label>
 
+        <input
+          id="messageSearch"
+          class="search-box"
+          type="search"
+          placeholder="🔍 Search messages in this room…"
+          autocomplete="off"
+        >
+      </section>
+
+      <div class="feature-divider"></div>
+
+      <!-- MESSAGES -->
       <div
         id="chatMessages"
         class="messages"
@@ -251,16 +320,12 @@
         <div class="empty-state">
           <span>✧</span>
           <strong>Your conversation starts here</strong>
-          <p>
-            Share the room code with the person you want to chat with.
-          </p>
+          <p>Share the room code with the person you want to chat with.</p>
         </div>
       </div>
 
-      <div
-        id="replyComposerPreview"
-        class="reply-composer-preview hidden"
-      >
+      <!-- REPLY PREVIEW -->
+      <div id="replyComposerPreview" class="reply-composer-preview hidden">
         <div>
           <strong>Replying to message</strong>
           <span id="replyPreviewText"></span>
@@ -270,19 +335,16 @@
           id="cancelReplyBtn"
           type="button"
           aria-label="Cancel reply"
-        >
-          ✕
-        </button>
+        >✕</button>
       </div>
 
+      <!-- MESSAGE INPUT -->
       <form id="messageForm" class="composer">
-
-        <label class="sr-only" for="messageInput">
-          Message
-        </label>
+        <label class="sr-only" for="messageInput">Message</label>
 
         <input
           id="messageInput"
+          type="text"
           maxlength="2000"
           placeholder="Write a message…"
           autocomplete="off"
@@ -294,11 +356,26 @@
           class="send-button"
           aria-label="Send message"
           type="submit"
-        >
-          ↑
-        </button>
-
+        >↑</button>
       </form>
+
+      <!-- ADDITIONAL CONTROLS -->
+      <div class="composer-extra">
+        <button id="attachmentBtn" type="button">📎 Attach file</button>
+        <button id="voiceMessageBtn" type="button">🎙 Voice message</button>
+      </div>
+
+      <input
+        id="attachmentInput"
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,audio/webm,audio/mp4,audio/ogg,audio/mpeg,application/pdf,text/plain,application/zip"
+        hidden
+      >
+
+      <p class="attachment-note">
+        File sharing and voice-message recording require their upload and
+        playback handlers to be configured in the app.
+      </p>
 
       <div class="chat-footer">
         <span id="chatStatus">Connecting…</span>
@@ -306,49 +383,118 @@
       </div>
 
       <p id="chatError" class="error" aria-live="polite"></p>
-
     </section>
 
+    <!-- INFORMATION -->
     <section class="info-grid">
-
       <article class="info-card">
         <span class="info-icon">⌁</span>
         <h3>Simple connection</h3>
-        <p>Create a room, share the code, and start messaging or calling.</p>
+        <p>Create a room, share its code, and start messaging or calling.</p>
       </article>
 
       <article class="info-card">
         <span class="info-icon">◷</span>
         <h3>Temporary by design</h3>
-        <p>Rooms expire after 30 minutes. Database cleanup needs separate configuration.</p>
+        <p>
+          Rooms have an expiry time. Automatic database cleanup requires
+          separate server configuration.
+        </p>
       </article>
 
       <article class="info-card">
         <span class="info-icon">⌘</span>
         <h3>Realtime communication</h3>
-        <p>Internet access is required to exchange messages and calls.</p>
+        <p>An internet connection is required for online messages and calls.</p>
       </article>
-
     </section>
 
     <footer>
-      <span>NETBAND <span class="copyright">/</span> VERSION 2.1</span>
+      <span>NETBAND <span class="copyright">/</span> VERSION 3.0</span>
       <span>Built for connection, designed with care.</span>
     </footer>
-
   </main>
 
-  <!-- SUPABASE -->
-
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- LIVEKIT -->
-
   <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.15.6/dist/livekit-client.umd.min.js"></script>
-
-  <!-- APP -->
-
   <script src="app.js"></script>
 
+  <!-- UI handlers; they do not pretend to upload files or record audio. -->
+  <script>
+    (() => {
+      const $ = id => document.getElementById(id);
+
+      $("shareRoomBtn")?.addEventListener("click", async () => {
+        const code = $("roomCodeDisplay")?.textContent?.trim();
+
+        if (!code || code === "--------") {
+          $("roomShareStatus").textContent = "Pehle room create ya join karo.";
+          return;
+        }
+
+        const url = new URL(location.href);
+        url.searchParams.set("room", code);
+
+        try {
+          if (navigator.share) {
+            await navigator.share({
+              title: "Join my NETBAND room",
+              text: `Room code: ${code}`,
+              url: url.href
+            });
+          } else {
+            await navigator.clipboard.writeText(url.href);
+            $("roomShareStatus").textContent = "Room link copied.";
+          }
+        } catch (error) {
+          if (error.name !== "AbortError") {
+            $("roomShareStatus").textContent = "Link share nahi ho saka.";
+          }
+        }
+      });
+
+      $("messageSearch")?.addEventListener("input", event => {
+        const term = event.target.value.toLowerCase();
+
+        document.querySelectorAll("#chatMessages .message").forEach(message => {
+          const text = message.querySelector(".message-text")?.textContent || "";
+
+          message.classList.toggle(
+            "hidden",
+            !text.toLowerCase().includes(term)
+          );
+        });
+      });
+
+      $("attachmentBtn")?.addEventListener("click", () => {
+        $("attachmentInput")?.click();
+      });
+
+      $("attachmentInput")?.addEventListener("change", event => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 10 * 1024 * 1024) {
+          alert("File maximum 10 MB ki honi chahiye.");
+          event.target.value = "";
+          return;
+        }
+
+        alert(
+          "File select ho gayi, lekin upload handler abhi configure nahi hai. " +
+          "File abhi send nahi hui."
+        );
+
+        event.target.value = "";
+      });
+
+      $("voiceMessageBtn")?.addEventListener("click", () => {
+        alert(
+          "Voice message recording aur upload feature ke liye " +
+          "MediaRecorder aur secure Supabase Storage integration abhi add karna hai."
+        );
+      });
+    })();
+  </script>
 </body>
 </html>

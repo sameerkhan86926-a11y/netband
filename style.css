@@ -1466,3 +1466,91 @@ footer strong {
     transition-duration: 0.01ms !important;
   }
 }
+/* =========================================
+   NETBAND LAYOUT HOTFIX
+========================================= */
+
+/* Prevent unwanted horizontal overflow */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+#setupPanel,
+#chatPanel {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+/* Restore message form to a single horizontal row */
+#messageForm {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  flex-wrap: nowrap;
+  width: 100%;
+}
+
+#messageInput {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+}
+
+#sendBtn {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+/* Keep buttons from stretching unexpectedly */
+#messageForm button {
+  width: auto;
+}
+
+/* Keep video tiles inside the chat panel */
+#videoGrid {
+  width: 100%;
+  min-width: 0;
+}
+
+.video-tile,
+.participant-video {
+  min-width: 0;
+}
+
+/* Fix mobile spacing */
+@media (max-width: 520px) {
+  #chatPanel {
+    width: 100%;
+    border-radius: 16px;
+  }
+
+  #messageForm {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  #messageInput {
+    flex: 1 1 65%;
+    width: auto;
+  }
+
+  #sendBtn {
+    flex: 0 0 auto;
+    min-width: 65px;
+  }
+
+  #chatMessages {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .chat-header {
+    min-width: 0;
+  }
+}

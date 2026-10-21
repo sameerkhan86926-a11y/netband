@@ -1,314 +1,205 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#080b14">
-<meta name="description" content="NETBAND — Temporary private chat and voice/video calling rooms.">
-<meta name="color-scheme" content="dark">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#080b14">
+  <meta name="description" content="NETBAND — Private temporary chat & calls with WhatsApp UX.">
+  <meta name="color-scheme" content="dark">
 
-<title>NETBAND 3.0 — Chat & Calls</title>
+  <title>NETBAND Web</title>
 
-<link rel="manifest" href="./manifest.json">
-<link rel="icon" href="./favicon.ico" sizes="any">
-<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
-<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
-<link rel="apple-touch-icon" href="./apple-touch-icon.png">
-<link rel="stylesheet" href="./style.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
   <div class="ambient ambient-one"></div>
   <div class="ambient ambient-two"></div>
 
-  <header class="topbar container">
-    <a class="brand" href="./" aria-label="NETBAND Home">
-<img
-  class="brand-icon"
-  src="./android-chrome-192x192.png"
-  alt="NETBAND Logo"
->
-      <div class="brand-meta">
-        <span class="brand-title">NETBAND</span>
-        <span class="brand-subtitle">Private · Temporary · Simple</span>
-      </div>
-    </a>
+  <!-- MAIN WHATSAPP-LIKE CONTAINER -->
+  <div class="wa-app-window">
 
-    <div class="status-indicator">
-      <span id="onlineDot" class="dot"></span>
-      <span id="networkLabel">Checking connection…</span>
+    <!-- LEFT SIDEBAR / SETUP PANEL -->
+    <aside class="wa-sidebar" id="sidebarPanel">
+      <header class="wa-sidebar-header">
+        <div class="wa-user-avatar" id="myAvatar">U</div>
+        <div class="wa-sidebar-title">
+          <strong>NETBAND</strong>
+          <small id="networkLabel">Connecting...</small>
+        </div>
+        <div class="wa-header-actions">
+          <span id="onlineDot" class="dot"></span>
+        </div>
+      </header>
+
+      <!-- SETUP CARD INSIDE SIDEBAR -->
+      <div class="wa-sidebar-content" id="setupPanel">
+        <div class="wa-panel-card">
+          <div class="wa-card-header">
+            <h3>Start Conversation</h3>
+            <p class="muted small">Temporary private chat rooms that expire in 30 mins.</p>
+          </div>
+
+          <button id="createBtn" class="wa-btn primary full-width" type="button">
+            ＋ New Room
+          </button>
+
+          <div class="wa-divider"><span>OR JOIN WITH CODE</span></div>
+
+          <form id="joinForm" class="wa-join-form">
+            <input
+              id="roomInput"
+              type="text"
+              maxlength="8"
+              minlength="8"
+              autocomplete="off"
+              autocapitalize="characters"
+              placeholder="ENTER 8-CHAR CODE"
+              required
+            >
+            <button class="wa-btn secondary full-width" type="submit">Join Room ↗</button>
+          </form>
+
+          <p id="setupError" class="error" aria-live="polite"></p>
+        </div>
+
+        <!-- QUICK FEATURES INFO -->
+        <div class="wa-info-pill-box">
+          <div class="wa-info-pill">◈ Ephemeral & Secure</div>
+          <div class="wa-info-pill">◷ 30-min Auto Purge</div>
+          <div class="wa-info-pill">◉ LiveKit Audio/Video</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- RIGHT MAIN CHAT AREA (WHATSAPP VIEW) -->
+    <main class="wa-main-chat" id="chatPanel">
+      
+      <!-- DEFAULT PLACEHOLDER (Jab koi room open na ho) -->
+      <div class="wa-empty-chat-view" id="emptyPlaceholder">
+        <div class="wa-empty-art">💬</div>
+        <h2>NETBAND Web</h2>
+        <p>Send and receive messages without an account.<br>Select "New Room" or enter a room code to get started.</p>
+        <span class="wa-enc-badge">🔒 End-to-end ephemeral session</span>
+      </div>
+
+      <!-- ACTIVE ROOM CHAT (WHATSAPP VIEWPORT) -->
+      <div class="wa-active-chat-view hidden" id="activeChatWrapper">
+
+        <!-- TOP BAR (WHATSAPP HEADER) -->
+        <header class="wa-chat-header">
+          <button id="backToSidebarBtn" class="wa-icon-btn mobile-only" type="button" aria-label="Back">
+            ←
+          </button>
+
+          <div class="wa-chat-avatar" id="roomAvatar">#</div>
+
+          <div class="wa-chat-info">
+            <div class="wa-chat-title-row">
+              <span class="wa-title" id="chatTitle">Temporary room</span>
+              <span class="wa-code-badge" id="roomCodeDisplay">--------</span>
+            </div>
+            <div class="wa-status-subtitle">
+              <span id="chatStatus">Online</span>
+              <span class="bullet">·</span>
+              <span id="expiryTitle">30:00</span>
+            </div>
+          </div>
+
+          <!-- TOP ACTIONS (CALLS, QR, SHARE) -->
+          <div class="wa-chat-tools">
+            <button id="joinVoiceBtn" class="wa-icon-btn" title="Voice Call" type="button">📞</button>
+            <button id="joinVideoBtn" class="wa-icon-btn" title="Video Call" type="button">🎥</button>
+            <button id="screenShareBtn" class="wa-icon-btn hidden" title="Share Screen" type="button">🖥</button>
+            <button id="showQrBtn" class="wa-icon-btn" title="Room QR" type="button">📱</button>
+            <button id="shareRoomBtn" class="wa-icon-btn" title="Copy Link" type="button">🔗</button>
+            <button id="leaveBtn" class="wa-icon-btn danger" title="Leave Room" type="button">✕</button>
+          </div>
+        </header>
+
+        <!-- VIDEO CALL OVERLAY DOCK (WHATSAPP PIP STYLE) -->
+        <div id="callOverlay" class="wa-call-dock hidden">
+          <div class="wa-call-dock-header">
+            <span id="callStatus">Call in progress...</span>
+            <div class="wa-call-dock-controls">
+              <button id="muteBtn" class="wa-dock-btn" type="button">🎤 Mute</button>
+              <button id="cameraBtn" class="wa-dock-btn" type="button">📷 Cam</button>
+              <button id="leaveCallBtn" class="wa-dock-btn danger" type="button">End</button>
+            </div>
+          </div>
+          <div id="videoGrid" class="wa-video-grid"></div>
+        </div>
+
+        <!-- SEARCH BAR (COLLAPSIBLE / COMPACT) -->
+        <div class="wa-search-subbar">
+          <input id="messageSearch" type="search" placeholder="Search in conversation..." autocomplete="off">
+        </div>
+
+        <!-- MESSAGES FEED (WHATSAPP BACKGROUND WALLPAPER FEEL) -->
+        <div id="chatMessages" class="wa-messages-body" role="log" aria-live="polite">
+          <div class="wa-system-pill">
+            Messages are temporary and disappear after the countdown.
+          </div>
+        </div>
+
+        <!-- TYPING INDICATOR -->
+        <div id="typingIndicator" class="wa-typing-indicator hidden">
+          <span class="dots"><span></span><span></span><span></span></span>
+          <span id="typingText">Guest is typing...</span>
+        </div>
+
+        <!-- REPLY PREVIEW STRIP -->
+        <div id="replyComposerPreview" class="wa-reply-strip hidden">
+          <div class="wa-reply-content">
+            <strong>Replying to message</strong>
+            <span id="replyPreviewText">...</span>
+          </div>
+          <button id="cancelReplyBtn" type="button">✕</button>
+        </div>
+
+        <!-- WHATSAPP COMPOSER BAR -->
+        <form id="messageForm" class="wa-composer-bar">
+          <button id="attachmentBtn" class="wa-composer-btn" type="button" title="Attach">📎</button>
+          
+          <div class="wa-input-pill">
+            <input
+              id="messageInput"
+              type="text"
+              maxlength="2000"
+              placeholder="Type a message"
+              autocomplete="off"
+              required
+            >
+          </div>
+
+          <button id="sendBtn" class="wa-send-btn" type="submit" aria-label="Send">
+            ➤
+          </button>
+        </form>
+
+        <input
+          id="attachmentInput"
+          type="file"
+          accept="image/*,video/*,application/pdf"
+          hidden
+        >
+      </div>
+    </main>
+
+  </div>
+
+  <!-- QR MODAL POPUP -->
+  <div id="qrModal" class="modal-backdrop hidden">
+    <div class="modal-box">
+      <h3>Scan to Join Room</h3>
+      <p class="muted small">Open your phone camera to join this conversation instantly.</p>
+      <div class="qr-container">
+        <img id="qrImage" src="" alt="Room QR Code" width="180" height="180">
+      </div>
+      <button id="closeQrBtn" class="wa-btn secondary full-width" type="button">Close</button>
     </div>
-  </header>
-
-  <main class="container shell">
-    <!-- HERO SECTION -->
-    <section class="hero">
-      <div class="hero-badge">
-        <span class="pulse-dot"></span>
-        TEMPORARY COMMUNICATION
-      </div>
-
-      <h1>Your space.<br><span class="gradient-text">Your conversation.</span></h1>
-
-      <p>
-        Create a room, share its code, and start chatting or calling
-        without creating an account.
-      </p>
-
-      <div class="hero-pills">
-        <span>◈ No account</span>
-        <span>◷ 30-minute rooms</span>
-        <span>⌁ Realtime messaging</span>
-        <span>◉ Voice, video & screen</span>
-      </div>
-    </section>
-
-    <!-- CREATE OR JOIN PANEL -->
-    <section class="panel setup-panel" id="setupPanel">
-      <div class="panel-heading">
-        <div>
-          <span class="step-label">01 / CONNECT</span>
-          <h2>Start a temporary room</h2>
-        </div>
-        <span class="panel-badge-icon">⌑</span>
-      </div>
-
-      <p class="panel-description">
-        Create a room or join an existing room using its 8-character code.
-      </p>
-
-      <button id="createBtn" class="btn primary full-width" type="button">
-        ＋ Create room
-      </button>
-
-      <div class="divider"><span>OR JOIN A ROOM</span></div>
-
-      <form id="joinForm" class="join-row">
-        <label class="sr-only" for="roomInput">Room code</label>
-        <input
-          id="roomInput"
-          type="text"
-          maxlength="8"
-          minlength="8"
-          autocomplete="off"
-          autocapitalize="characters"
-          placeholder="ENTER 8-CHAR CODE"
-          required
-        >
-        <button class="btn secondary" type="submit">Join room ↗</button>
-      </form>
-
-      <p id="setupError" class="error" aria-live="polite"></p>
-    </section>
-
-    <!-- ACTIVE CHAT & CALL PANEL -->
-    <section class="panel chat-panel hidden" id="chatPanel">
-      <div class="chat-header">
-        <div>
-          <span class="step-label">02 / LIVE ROOM</span>
-          <h2 id="chatTitle">Temporary room</h2>
-
-          <div class="room-meta">
-            <span>CODE:</span>
-            <strong id="roomCodeDisplay">--------</strong>
-            <button id="copyCodeBtn" class="btn-text" type="button">Copy</button>
-            <button id="showQrBtn" class="btn-text" type="button">QR Code</button>
-          </div>
-        </div>
-
-        <button id="leaveBtn" class="btn btn-danger" type="button">
-          Leave room
-        </button>
-      </div>
-
-      <div class="extra-tools">
-        <button id="shareRoomBtn" class="tool-button" type="button">
-          🔗 Share link
-        </button>
-        <button id="muteSoundBtn" class="tool-button" type="button">
-          🔔 Sound: ON
-        </button>
-      </div>
-
-      <p id="roomShareStatus" class="attachment-note" aria-live="polite"></p>
-
-      <!-- ROOM EXPIRY TRACKER -->
-      <div class="expiry-panel">
-        <div class="expiry-header">
-          <span>◷</span>
-          <div class="expiry-copy">
-            <strong id="expiryTitle">Room expires in 30:00</strong>
-            <small>Save anything important before room expires.</small>
-          </div>
-        </div>
-
-        <div class="expiry-track">
-          <div id="expiryBar" style="width: 100%;"></div>
-        </div>
-      </div>
-
-      <!-- VOICE, VIDEO & SCREEN SHARE PANEL -->
-      <section class="call-panel">
-        <div class="call-header">
-          <div>
-            <span class="step-label">03 / LIVE CALL</span>
-            <h3>Voice, video & screen</h3>
-          </div>
-          <span id="callStatus" class="call-status">Not in a call</span>
-        </div>
-
-        <p class="call-help">
-          Join the call to speak with members or share your display screen.
-        </p>
-
-        <div class="call-actions">
-          <button id="joinVoiceBtn" class="btn primary" type="button">
-            🎙 Join voice
-          </button>
-          <button id="joinVideoBtn" class="btn secondary" type="button">
-            🎥 Join video
-          </button>
-          <button id="muteBtn" class="btn btn-ghost" type="button" disabled>
-            Mute mic
-          </button>
-          <button id="cameraBtn" class="btn btn-ghost" type="button" disabled>
-            Turn camera on
-          </button>
-          <button id="screenShareBtn" class="btn btn-ghost" type="button" disabled>
-            🖥 Share screen
-          </button>
-          <button id="leaveCallBtn" class="btn btn-danger" type="button" disabled>
-            Leave call
-          </button>
-        </div>
-
-        <div class="call-layout">
-          <div id="videoGrid" class="video-grid">
-            <div id="videoEmpty" class="video-empty">
-              <span class="empty-icon">◉</span>
-              <strong>No active call</strong>
-              <small>Join voice, video or screen share to connect.</small>
-            </div>
-          </div>
-
-          <aside class="participants-panel">
-            <div class="participants-title">
-              <span>Participants</span>
-              <span id="participantCount" class="badge-count">0</span>
-            </div>
-            <div id="participantList" class="participant-list">
-              <p class="muted small">No participants yet.</p>
-            </div>
-          </aside>
-        </div>
-
-        <p id="callError" class="error" aria-live="polite"></p>
-      </section>
-
-      <!-- SEARCH BOX -->
-      <div class="search-section">
-        <label class="sr-only" for="messageSearch">Search messages</label>
-        <input
-          id="messageSearch"
-          class="search-box"
-          type="search"
-          placeholder="🔍 Search messages in this room…"
-          autocomplete="off"
-        >
-      </div>
-
-      <!-- MESSAGES DISPLAY -->
-      <div
-        id="chatMessages"
-        class="messages-container"
-        role="log"
-        aria-live="polite"
-        aria-relevant="additions"
-      >
-        <div class="empty-state">
-          <span>✧</span>
-          <strong>Your conversation starts here</strong>
-          <p>Share the room code or QR with the person you want to chat with.</p>
-        </div>
-      </div>
-
-      <!-- TYPING INDICATOR -->
-      <div id="typingIndicator" class="typing-indicator hidden">
-        <span class="typing-dots"><span></span><span></span><span></span></span>
-        <span id="typingText">Someone is typing...</span>
-      </div>
-
-      <!-- REPLY PREVIEW -->
-      <div id="replyComposerPreview" class="reply-composer-preview hidden">
-        <div class="reply-content">
-          <strong>Replying to message</strong>
-          <span id="replyPreviewText"></span>
-        </div>
-        <button id="cancelReplyBtn" type="button" aria-label="Cancel reply">✕</button>
-      </div>
-
-      <!-- COMPOSER -->
-      <form id="messageForm" class="composer-form">
-        <label class="sr-only" for="messageInput">Message</label>
-        <input
-          id="messageInput"
-          type="text"
-          maxlength="2000"
-          placeholder="Write a message…"
-          autocomplete="off"
-          required
-        >
-        <button id="sendBtn" class="btn primary send-btn" aria-label="Send message" type="submit">
-          ↑
-        </button>
-      </form>
-
-      <div class="chat-footer">
-        <span id="chatStatus">Connecting…</span>
-        <span>End-to-end ephemeral session</span>
-      </div>
-
-      <p id="chatError" class="error" aria-live="polite"></p>
-    </section>
-
-    <!-- QR CODE MODAL -->
-    <div id="qrModal" class="modal-backdrop hidden">
-      <div class="modal-box">
-        <h3>Scan to join room</h3>
-        <p class="muted small">Scan this code using any phone camera to join instantly.</p>
-        <div class="qr-container">
-          <img id="qrImage" src="" alt="Room QR Code" width="180" height="180">
-        </div>
-        <button id="closeQrBtn" class="btn secondary full-width" type="button">Close</button>
-      </div>
-    </div>
-
-    <!-- INFO CARDS -->
-    <section class="info-grid">
-      <article class="info-card">
-        <span class="info-icon">⌁</span>
-        <h3>Simple connection</h3>
-        <p>Create a room, share its code or QR, and start messaging or calling instantly.</p>
-      </article>
-
-      <article class="info-card">
-        <span class="info-icon">◷</span>
-        <h3>Temporary by design</h3>
-        <p>Rooms and data disappear automatically once the 30-minute countdown ends.</p>
-      </article>
-
-      <article class="info-card">
-        <span class="info-icon">⌘</span>
-        <h3>Voice, video & screen</h3>
-        <p>Low latency WebRTC streaming powered by LiveKit engine.</p>
-      </article>
-    </section>
-
-    <footer class="app-footer">
-      <span>NETBAND <span class="copyright">/</span> VERSION 3.0</span>
-      <span>Built for connection, designed with care.</span>
-    </footer>
-  </main>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.15.6/dist/livekit-client.umd.min.js"></script>

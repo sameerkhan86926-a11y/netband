@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#08111f">
 
-  <title>NETBAND 2.0 — Temporary Messaging</title>
+  <title>NETBAND 2.1 — Chat & Calls</title>
 
   <meta name="description"
-    content="NETBAND is a temporary room-based messaging platform. Create a room, share the code, and chat without an account.">
+    content="NETBAND temporary chat and voice/video calling rooms.">
 
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
@@ -34,6 +34,7 @@
   </header>
 
   <main class="shell">
+
     <section class="hero">
       <div class="eyebrow">
         <span class="pulse"></span>
@@ -44,17 +45,19 @@
 
       <p>
         Create a room, share its code, and start chatting
-        without creating an account.
+        or calling without creating an account.
       </p>
 
       <div class="hero-pills">
         <span>◈ No account</span>
         <span>◷ 30-minute rooms</span>
         <span>⌁ Realtime messaging</span>
+        <span>◉ Voice & video</span>
       </div>
     </section>
 
     <section class="panel setup-panel" id="setupPanel">
+
       <div class="panel-heading">
         <div>
           <span class="step">01 / CONNECT</span>
@@ -72,7 +75,9 @@
         ＋ Create room
       </button>
 
-      <div class="divider"><span>OR JOIN A ROOM</span></div>
+      <div class="divider">
+        <span>OR JOIN A ROOM</span>
+      </div>
 
       <form id="joinForm" class="join-row">
         <label class="sr-only" for="roomInput">Room code</label>
@@ -96,6 +101,7 @@
     </section>
 
     <section class="panel chat-panel hidden" id="chatPanel">
+
       <div class="chat-top">
         <div>
           <span class="step">02 / LIVE ROOM</span>
@@ -105,14 +111,18 @@
             CODE
             <strong id="roomCodeDisplay">--------</strong>
 
-            <button id="copyCodeBtn" class="text-button" type="button">
+            <button
+              id="copyCodeBtn"
+              class="text-button"
+              type="button"
+            >
               Copy code
             </button>
           </div>
         </div>
 
         <button id="leaveBtn" class="button ghost" type="button">
-          Leave
+          Leave room
         </button>
       </div>
 
@@ -129,6 +139,108 @@
         </div>
       </div>
 
+      <!-- VOICE AND VIDEO CALLING -->
+
+      <section class="call-panel">
+
+        <div class="call-heading">
+          <div>
+            <span class="step">03 / LIVE CALL</span>
+            <h3>Voice & video</h3>
+          </div>
+
+          <span id="callStatus" class="call-status">
+            Not in a call
+          </span>
+        </div>
+
+        <p class="call-help">
+          Start a voice or video call with people in this room.
+          Allow microphone or camera access when prompted.
+        </p>
+
+        <div class="call-actions">
+
+          <button
+            id="joinVoiceBtn"
+            class="button primary"
+            type="button"
+          >
+            🎙 Join voice
+          </button>
+
+          <button
+            id="joinVideoBtn"
+            class="button secondary"
+            type="button"
+          >
+            🎥 Join video
+          </button>
+
+          <button
+            id="muteBtn"
+            class="button ghost"
+            type="button"
+            disabled
+          >
+            Mute mic
+          </button>
+
+          <button
+            id="cameraBtn"
+            class="button ghost"
+            type="button"
+            disabled
+          >
+            Turn camera on
+          </button>
+
+          <button
+            id="leaveCallBtn"
+            class="button danger"
+            type="button"
+            disabled
+          >
+            Leave call
+          </button>
+
+        </div>
+
+        <div class="call-layout">
+
+          <div id="videoGrid" class="video-grid">
+
+            <div id="videoEmpty" class="video-empty">
+              <span>◉</span>
+              <strong>No active call</strong>
+              <small>
+                Join voice or video to connect with room members.
+              </small>
+            </div>
+
+          </div>
+
+          <aside class="participants-panel">
+
+            <div class="participants-title">
+              Participants
+              <span id="participantCount">0</span>
+            </div>
+
+            <div id="participantList" class="participant-list">
+              <p class="muted small">No participants yet.</p>
+            </div>
+
+          </aside>
+
+        </div>
+
+        <p id="callError" class="error" aria-live="polite"></p>
+
+      </section>
+
+      <!-- CHAT MESSAGES -->
+
       <div
         id="chatMessages"
         class="messages"
@@ -139,23 +251,35 @@
         <div class="empty-state">
           <span>✧</span>
           <strong>Your conversation starts here</strong>
-          <p>Share the room code with the person you want to chat with.</p>
+          <p>
+            Share the room code with the person you want to chat with.
+          </p>
         </div>
       </div>
 
-      <div id="replyComposerPreview" class="reply-composer-preview hidden">
+      <div
+        id="replyComposerPreview"
+        class="reply-composer-preview hidden"
+      >
         <div>
           <strong>Replying to message</strong>
           <span id="replyPreviewText"></span>
         </div>
 
-        <button id="cancelReplyBtn" type="button" aria-label="Cancel reply">
+        <button
+          id="cancelReplyBtn"
+          type="button"
+          aria-label="Cancel reply"
+        >
           ✕
         </button>
       </div>
 
       <form id="messageForm" class="composer">
-        <label class="sr-only" for="messageInput">Message</label>
+
+        <label class="sr-only" for="messageInput">
+          Message
+        </label>
 
         <input
           id="messageInput"
@@ -170,7 +294,10 @@
           class="send-button"
           aria-label="Send message"
           type="submit"
-        >↑</button>
+        >
+          ↑
+        </button>
+
       </form>
 
       <div class="chat-footer">
@@ -179,35 +306,49 @@
       </div>
 
       <p id="chatError" class="error" aria-live="polite"></p>
+
     </section>
 
     <section class="info-grid">
+
       <article class="info-card">
         <span class="info-icon">⌁</span>
         <h3>Simple connection</h3>
-        <p>Create a room, share the code, and start messaging.</p>
+        <p>Create a room, share the code, and start messaging or calling.</p>
       </article>
 
       <article class="info-card">
         <span class="info-icon">◷</span>
         <h3>Temporary by design</h3>
-        <p>Server-side cleanup must be configured for database deletion.</p>
+        <p>Rooms expire after 30 minutes. Database cleanup needs separate configuration.</p>
       </article>
 
       <article class="info-card">
         <span class="info-icon">⌘</span>
-        <h3>Realtime messaging</h3>
-        <p>Internet access is required to exchange messages between phones.</p>
+        <h3>Realtime communication</h3>
+        <p>Internet access is required to exchange messages and calls.</p>
       </article>
+
     </section>
 
     <footer>
-      <span>NETBAND <span class="copyright">/</span> VERSION 2.0</span>
+      <span>NETBAND <span class="copyright">/</span> VERSION 2.1</span>
       <span>Built for connection, designed with care.</span>
     </footer>
+
   </main>
 
+  <!-- SUPABASE -->
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- LIVEKIT -->
+
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.15.6/dist/livekit-client.umd.min.js"></script>
+
+  <!-- APP -->
+
   <script src="app.js"></script>
+
 </body>
 </html>

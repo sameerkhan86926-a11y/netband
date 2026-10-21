@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
-  <meta name="theme-color" content="#080b14">
-  <meta name="description" content="NETBAND — Private temporary chat & calls with WhatsApp UX.">
+  <meta name="theme-color" content="#0b101b">
+  <meta name="description" content="NETBAND — Ultra-private temporary chat and peer-to-peer calls.">
   <meta name="color-scheme" content="dark">
 
-  <title>NETBAND Web</title>
+  <title>NETBAND Web — Private Temporary Spaces</title>
 
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
@@ -17,150 +17,208 @@
   <div class="ambient ambient-one"></div>
   <div class="ambient ambient-two"></div>
 
-  <!-- MAIN WHATSAPP-LIKE CONTAINER -->
+  <!-- WHATSAPP WEB STYLE APPLICATION WINDOW -->
   <div class="wa-app-window">
 
-    <!-- LEFT SIDEBAR / SETUP PANEL -->
+    <!-- LEFT SIDEBAR -->
     <aside class="wa-sidebar" id="sidebarPanel">
       <header class="wa-sidebar-header">
-        <div class="wa-user-avatar" id="myAvatar">U</div>
+        <div class="wa-avatar" id="myAvatar">U</div>
         <div class="wa-sidebar-title">
-          <strong>NETBAND</strong>
-          <small id="networkLabel">Connecting...</small>
-        </div>
-        <div class="wa-header-actions">
-          <span id="onlineDot" class="dot"></span>
+          <h2>NETBAND</h2>
+          <span class="wa-conn-status">
+            <span id="onlineDot" class="dot"></span>
+            <span id="networkLabel">Connecting…</span>
+          </span>
         </div>
       </header>
 
-      <!-- SETUP CARD INSIDE SIDEBAR -->
       <div class="wa-sidebar-content" id="setupPanel">
-        <div class="wa-panel-card">
+        <div class="wa-card">
           <div class="wa-card-header">
-            <h3>Start Conversation</h3>
-            <p class="muted small">Temporary private chat rooms that expire in 30 mins.</p>
+            <h3>Start a Session</h3>
+            <p>Direct peer communication that auto-destructs after 30 minutes.</p>
           </div>
 
           <button id="createBtn" class="wa-btn primary full-width" type="button">
-            ＋ New Room
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Create New Room
           </button>
 
           <div class="wa-divider"><span>OR JOIN WITH CODE</span></div>
 
           <form id="joinForm" class="wa-join-form">
-            <input
-              id="roomInput"
-              type="text"
-              maxlength="8"
-              minlength="8"
-              autocomplete="off"
-              autocapitalize="characters"
-              placeholder="ENTER 8-CHAR CODE"
-              required
-            >
-            <button class="wa-btn secondary full-width" type="submit">Join Room ↗</button>
+            <div class="wa-input-wrap">
+              <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              <input
+                id="roomInput"
+                type="text"
+                maxlength="8"
+                minlength="8"
+                autocomplete="off"
+                autocapitalize="characters"
+                placeholder="ENTER 8-CHAR CODE"
+                required
+              >
+            </div>
+            <button class="wa-btn secondary full-width" type="submit">
+              Join Room
+              <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            </button>
           </form>
 
           <p id="setupError" class="error" aria-live="polite"></p>
         </div>
 
-        <!-- QUICK FEATURES INFO -->
-        <div class="wa-info-pill-box">
-          <div class="wa-info-pill">◈ Ephemeral & Secure</div>
-          <div class="wa-info-pill">◷ 30-min Auto Purge</div>
-          <div class="wa-info-pill">◉ LiveKit Audio/Video</div>
+        <div class="wa-info-cards">
+          <div class="wa-info-item">
+            <svg class="info-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            <div>
+              <strong>No Account Required</strong>
+              <small>Zero logs, strictly client-side temporary state.</small>
+            </div>
+          </div>
+          <div class="wa-info-item">
+            <svg class="info-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <div>
+              <strong>30-Minute Lifetime</strong>
+              <small>Rooms, messages & media purge automatically.</small>
+            </div>
+          </div>
         </div>
       </div>
     </aside>
 
-    <!-- RIGHT MAIN CHAT AREA (WHATSAPP VIEW) -->
+    <!-- RIGHT MAIN CHAT AREA -->
     <main class="wa-main-chat" id="chatPanel">
       
-      <!-- DEFAULT PLACEHOLDER (Jab koi room open na ho) -->
+      <!-- EMPTY STATE PLACEHOLDER -->
       <div class="wa-empty-chat-view" id="emptyPlaceholder">
-        <div class="wa-empty-art">💬</div>
+        <div class="wa-empty-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        </div>
         <h2>NETBAND Web</h2>
-        <p>Send and receive messages without an account.<br>Select "New Room" or enter a room code to get started.</p>
-        <span class="wa-enc-badge">🔒 End-to-end ephemeral session</span>
+        <p>End-to-end encrypted temporary communications. Create a space or input an invitation code to initiate messaging and calls.</p>
+        <div class="wa-enc-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          End-to-end ephemeral session
+        </div>
       </div>
 
-      <!-- ACTIVE ROOM CHAT (WHATSAPP VIEWPORT) -->
+      <!-- ACTIVE CHAT VIEWPORT -->
       <div class="wa-active-chat-view hidden" id="activeChatWrapper">
 
-        <!-- TOP BAR (WHATSAPP HEADER) -->
+        <!-- HEADER -->
         <header class="wa-chat-header">
           <button id="backToSidebarBtn" class="wa-icon-btn mobile-only" type="button" aria-label="Back">
-            ←
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
           </button>
 
-          <div class="wa-chat-avatar" id="roomAvatar">#</div>
+          <div class="wa-chat-avatar" id="roomAvatar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          </div>
 
           <div class="wa-chat-info">
             <div class="wa-chat-title-row">
-              <span class="wa-title" id="chatTitle">Temporary room</span>
-              <span class="wa-code-badge" id="roomCodeDisplay">--------</span>
+              <span class="wa-title" id="chatTitle">Temporary Space</span>
+              <span class="wa-code-pill" id="roomCodeDisplay">--------</span>
             </div>
-            <div class="wa-status-subtitle">
-              <span id="chatStatus">Online</span>
+            <div class="wa-status-row">
+              <span id="chatStatus">online</span>
               <span class="bullet">·</span>
-              <span id="expiryTitle">30:00</span>
+              <span class="timer-tag">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <span id="expiryTitle">30:00</span>
+              </span>
             </div>
           </div>
 
-          <!-- TOP ACTIONS (CALLS, QR, SHARE) -->
+          <!-- TOP ACTION BUTTONS -->
           <div class="wa-chat-tools">
-            <button id="joinVoiceBtn" class="wa-icon-btn" title="Voice Call" type="button">📞</button>
-            <button id="joinVideoBtn" class="wa-icon-btn" title="Video Call" type="button">🎥</button>
-            <button id="screenShareBtn" class="wa-icon-btn hidden" title="Share Screen" type="button">🖥</button>
-            <button id="showQrBtn" class="wa-icon-btn" title="Room QR" type="button">📱</button>
-            <button id="shareRoomBtn" class="wa-icon-btn" title="Copy Link" type="button">🔗</button>
-            <button id="leaveBtn" class="wa-icon-btn danger" title="Leave Room" type="button">✕</button>
+            <button id="joinVoiceBtn" class="wa-icon-btn" title="Voice Call" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+            </button>
+            <button id="joinVideoBtn" class="wa-icon-btn" title="Video Call" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+            </button>
+            <button id="screenShareBtn" class="wa-icon-btn hidden" title="Share Screen" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            </button>
+            <button id="showQrBtn" class="wa-icon-btn" title="QR Code" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            </button>
+            <button id="shareRoomBtn" class="wa-icon-btn" title="Share Link" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            </button>
+            <button id="leaveBtn" class="wa-icon-btn danger" title="Leave Session" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            </button>
           </div>
         </header>
 
-        <!-- VIDEO CALL OVERLAY DOCK (WHATSAPP PIP STYLE) -->
+        <!-- VIDEO CALL PIP OVERLAY -->
         <div id="callOverlay" class="wa-call-dock hidden">
           <div class="wa-call-dock-header">
-            <span id="callStatus">Call in progress...</span>
-            <div class="wa-call-dock-controls">
-              <button id="muteBtn" class="wa-dock-btn" type="button">🎤 Mute</button>
-              <button id="cameraBtn" class="wa-dock-btn" type="button">📷 Cam</button>
-              <button id="leaveCallBtn" class="wa-dock-btn danger" type="button">End</button>
+            <div class="wa-call-meta">
+              <span class="live-indicator"></span>
+              <span id="callStatus">Call in progress…</span>
+            </div>
+            <div class="wa-call-controls">
+              <button id="muteBtn" class="wa-dock-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                <span>Mute</span>
+              </button>
+              <button id="cameraBtn" class="wa-dock-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                <span>Cam</span>
+              </button>
+              <button id="leaveCallBtn" class="wa-dock-btn danger" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                <span>End</span>
+              </button>
             </div>
           </div>
           <div id="videoGrid" class="wa-video-grid"></div>
         </div>
 
-        <!-- SEARCH BAR (COLLAPSIBLE / COMPACT) -->
+        <!-- SEARCH BAR -->
         <div class="wa-search-subbar">
-          <input id="messageSearch" type="search" placeholder="Search in conversation..." autocomplete="off">
+          <div class="wa-search-pill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input id="messageSearch" type="search" placeholder="Search in conversation…" autocomplete="off">
+          </div>
         </div>
 
-        <!-- MESSAGES FEED (WHATSAPP BACKGROUND WALLPAPER FEEL) -->
+        <!-- MESSAGES FEED -->
         <div id="chatMessages" class="wa-messages-body" role="log" aria-live="polite">
           <div class="wa-system-pill">
-            Messages are temporary and disappear after the countdown.
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            Messages and media are ephemeral and vanish once time expires.
           </div>
         </div>
 
         <!-- TYPING INDICATOR -->
         <div id="typingIndicator" class="wa-typing-indicator hidden">
           <span class="dots"><span></span><span></span><span></span></span>
-          <span id="typingText">Guest is typing...</span>
+          <span id="typingText">Guest is typing…</span>
         </div>
 
-        <!-- REPLY PREVIEW STRIP -->
+        <!-- REPLY STRIP -->
         <div id="replyComposerPreview" class="wa-reply-strip hidden">
           <div class="wa-reply-content">
-            <strong>Replying to message</strong>
-            <span id="replyPreviewText">...</span>
+            <strong id="replyPreviewUser">Replying to message</strong>
+            <span id="replyPreviewText">…</span>
           </div>
-          <button id="cancelReplyBtn" type="button">✕</button>
+          <button id="cancelReplyBtn" class="wa-reply-close" type="button" aria-label="Cancel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
         </div>
 
-        <!-- WHATSAPP COMPOSER BAR -->
+        <!-- COMPOSER BAR -->
         <form id="messageForm" class="wa-composer-bar">
-          <button id="attachmentBtn" class="wa-composer-btn" type="button" title="Attach">📎</button>
+          <button id="attachmentBtn" class="wa-composer-btn" type="button" title="Attach file">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+          </button>
           
           <div class="wa-input-pill">
             <input
@@ -174,7 +232,7 @@
           </div>
 
           <button id="sendBtn" class="wa-send-btn" type="submit" aria-label="Send">
-            ➤
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
           </button>
         </form>
 
@@ -189,15 +247,19 @@
 
   </div>
 
-  <!-- QR MODAL POPUP -->
+  <!-- QR CODE MODAL POPUP -->
   <div id="qrModal" class="modal-backdrop hidden">
     <div class="modal-box">
-      <h3>Scan to Join Room</h3>
-      <p class="muted small">Open your phone camera to join this conversation instantly.</p>
+      <div class="modal-header">
+        <h3>Room QR Code</h3>
+        <button id="closeQrBtn" class="wa-modal-close" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <p class="muted">Scan with a camera to jump straight into this secure temporary room.</p>
       <div class="qr-container">
         <img id="qrImage" src="" alt="Room QR Code" width="180" height="180">
       </div>
-      <button id="closeQrBtn" class="wa-btn secondary full-width" type="button">Close</button>
     </div>
   </div>
 

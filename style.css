@@ -130,16 +130,12 @@ body {
 }
 
 .brand-icon {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--gradient);
-  color: #fff;
-  font-weight: 900;
-  font-size: 18px;
-  box-shadow: 0 4px 16px rgba(124, 92, 255, 0.4);
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  object-fit: contain;
+  display: block;
+  border-radius: 12px;
 }
 
 .brand-meta {

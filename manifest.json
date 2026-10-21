@@ -1,0 +1,11 @@
+{
+  "name": "NETBAND — Offline-First Network",
+  "short_name": "NETBAND",
+  "description": "Offline-first notes and emergency information prototype.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#07111f",
+  "theme_color": "#07111f",
+  "icons": []
+}

@@ -37,7 +37,6 @@
     typingTimer: null
   };
 
-  /* Web Audio Synthesizer: Native Notification Sound */
   function playNotificationSound() {
     if (!state.soundEnabled) return;
     try {
@@ -46,8 +45,8 @@
       const gain = audioCtx.createGain();
 
       osc.type = "sine";
-      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
-      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1); // A5
+      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
 
       gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
@@ -61,11 +60,10 @@
   }
 
   function getSenderId() {
-    const key = "netband_sender_id";
-    let id = sessionStorage.getItem(key);
+    let id = sessionStorage.getItem("netband_sender_id");
     if (!id) {
       id = crypto.randomUUID();
-      sessionStorage.setItem(key, id);
+      sessionStorage.setItem("netband_sender_id", id);
     }
     return id;
   }
@@ -100,10 +98,8 @@
     state.busy = value;
     if ($("createBtn")) $("createBtn").disabled = value;
     if ($("roomInput")) $("roomInput").disabled = value;
-    if ($("joinForm")) {
-      const btn = $("joinForm").querySelector('button[type="submit"]');
-      if (btn) btn.disabled = value;
-    }
+    const btn = $("joinForm")?.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = value;
   }
 
   function generateRoomCode() {
@@ -141,23 +137,24 @@
 
   function setNetworkStatus() {
     const online = navigator.onLine;
-    setText("networkLabel", online ? "Internet connected" : "You're offline");
+    setText("networkLabel", online ? "Online" : "Offline");
     const dot = $("onlineDot");
     if (dot) {
       dot.style.background = online ? "var(--success)" : "var(--danger)";
-      dot.style.boxShadow = online ? "0 0 10px rgba(54, 229, 162, 0.7)" : "0 0 10px rgba(255, 85, 119, 0.7)";
     }
   }
 
+  /* WhatsApp View Switcher */
   function showChat(room) {
     state.room = room;
     state.roomCode = room.code;
     state.expiresAt = new Date(room.expires_at).getTime();
 
-    $("setupPanel")?.classList.add("hidden");
-    $("chatPanel")?.classList.remove("hidden");
+    document.querySelector(".wa-app-window")?.classList.add("in-chat");
+    $("emptyPlaceholder")?.classList.add("hidden");
+    $("activeChatWrapper")?.classList.remove("hidden");
 
-    setText("chatTitle", "Temporary room");
+    setText("chatTitle", `Room #${room.code.slice(0, 4)}`);
     setText("roomCodeDisplay", room.code);
 
     const shareUrl = new URL(location.href);
@@ -173,16 +170,11 @@
       const remaining = state.expiresAt - Date.now();
       if (remaining <= 0) {
         clearInterval(state.timer);
-        setText("expiryTitle", "Room time has ended");
-        if ($("expiryBar")) $("expiryBar").style.width = "0%";
         leaveRoom();
-        showError("setupError", "Room expire ho gaya. Naya room banayein.");
+        showError("setupError", "Room expire ho chuka hai.");
         return;
       }
-      setText("expiryTitle", `Room expires in ${formatDuration(remaining)}`);
-      if ($("expiryBar")) {
-        $("expiryBar").style.width = `${Math.min(100, (remaining / CONFIG.ROOM_DURATION) * 100)}%`;
-      }
+      setText("expiryTitle", formatDuration(remaining));
     }
     update();
     state.timer = setInterval(update, 1000);
@@ -209,10 +201,10 @@
         if (!String(error.message || "").toLowerCase().includes("duplicate")) throw error;
       }
 
-      if (!createdRoom) throw new Error("Room create nahi hua.");
+      if (!createdRoom) throw new Error("Room create fail hua.");
       await connectToRoom(createdRoom);
     } catch (err) {
-      showError("setupError", err.message || "Room create fail hua.");
+      showError("setupError", err.message || "Room create nahi hua.");
     } finally {
       setBusy(false);
     }
@@ -239,7 +231,7 @@
         .maybeSingle();
 
       if (error) throw error;
-      if (!data) throw new Error("Room nahi mila ya expire ho chuka hai.");
+      if (!data) throw new Error("Room nahi mila ya expire ho gaya.");
       await connectToRoom(data);
     } catch (err) {
       showError("setupError", err.message || "Join failed.");
@@ -271,7 +263,7 @@
       (data || []).forEach(m => renderMessage(m, false));
 
       state.channel = client
-        .channel(`netband-room-${room.id}`)
+        .channel(`netband-room-${room.id}`, { config: { broadcast: { self: false } } })
         .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `room_id=eq.${room.id}` }, payload => {
           if (payload.eventType === "INSERT") renderMessage(payload.new, true);
           else if (payload.eventType === "UPDATE") updateMessage(payload.new);
@@ -283,11 +275,10 @@
           }
         })
         .subscribe(status => {
-          if (status === "SUBSCRIBED") setText("chatStatus", "Connected · Realtime");
+          if (status === "SUBSCRIBED") setText("chatStatus", "online");
         });
     } catch (err) {
-      showError("chatError", err.message || "Load failed.");
-      setText("chatStatus", "Connection failed");
+      setText("chatStatus", "error");
     }
   }
 
@@ -299,7 +290,7 @@
   function handleTypingIndicator(name) {
     const indicator = $("typingIndicator");
     if (!indicator) return;
-    setText("typingText", `${name || "Someone"} is typing...`);
+    setText("typingText", `${name || "Guest"} is typing...`);
     indicator.classList.remove("hidden");
 
     clearTimeout(state.typingTimer);
@@ -308,8 +299,13 @@
     }, 2000);
   }
 
+  let lastTypingBroadcast = 0;
   function emitTyping() {
     if (!state.channel || !state.room) return;
+    const now = Date.now();
+    if (now - lastTypingBroadcast < 1000) return;
+    lastTypingBroadcast = now;
+
     state.channel.send({
       type: "broadcast",
       event: "typing",
@@ -317,6 +313,7 @@
     });
   }
 
+  /* WhatsApp Style Message Bubble Builder */
   function renderMessage(message, isNew = false) {
     if (!message || message.id == null) return;
     const id = String(message.id);
@@ -327,7 +324,6 @@
 
     const container = $("chatMessages");
     if (!container) return;
-    container.querySelector(".empty-state")?.remove();
 
     const decoded = decodeMessageBody(message.body);
     const own = message.sender_id === state.senderId;
@@ -338,59 +334,79 @@
     article.className = `message${own ? " own" : ""}`;
     article.dataset.messageId = id;
 
-    const sender = document.createElement("span");
-    sender.className = "message-sender";
-    sender.textContent = own ? "You" : `Guest-${String(message.sender_id).slice(0, 5)}`;
+    if (!own) {
+      const sender = document.createElement("span");
+      sender.className = "message-sender";
+      sender.textContent = `Guest-${String(message.sender_id).slice(0, 4)}`;
+      article.appendChild(sender);
+    }
 
     if (decoded.replyTo) {
       const reply = document.createElement("div");
       reply.className = "reply-quote";
-      reply.textContent = `Replying to: #${decoded.replyTo}`;
+      reply.textContent = `Replying to message`;
       article.appendChild(reply);
     }
 
     const content = document.createElement("div");
     content.className = "message-text";
     content.textContent = message.deleted_at ? "This message was deleted." : decoded.text;
+    article.appendChild(content);
 
-    const time = document.createElement("div");
+    // Meta row (WhatsApp Time + Blue Double Tick)
+    const metaRow = document.createElement("div");
+    metaRow.className = "message-meta-row";
+
+    const time = document.createElement("span");
     time.className = "message-time";
-    time.textContent = formatTime(message.created_at) + (message.edited_at ? " · edited" : "");
+    time.textContent = formatTime(message.created_at);
+    metaRow.appendChild(time);
 
+    if (own) {
+      const tick = document.createElement("span");
+      tick.className = "message-tick";
+      tick.textContent = "✓✓";
+      metaRow.appendChild(tick);
+    }
+
+    article.appendChild(metaRow);
+
+    // Message Actions (WhatsApp-like Quick Options on Hover)
     const actions = document.createElement("div");
     actions.className = "message-actions";
 
-    const replyButton = document.createElement("button");
-    replyButton.type = "button";
-    replyButton.textContent = "Reply";
-    replyButton.addEventListener("click", () => setReply(message));
-    actions.appendChild(replyButton);
+    const replyBtn = document.createElement("button");
+    replyBtn.type = "button";
+    replyBtn.textContent = "Reply";
+    replyBtn.onclick = () => setReply(message);
+    actions.appendChild(replyBtn);
 
-    const copyButton = document.createElement("button");
-    copyButton.type = "button";
-    copyButton.textContent = "Copy";
-    copyButton.addEventListener("click", async () => {
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.textContent = "Copy";
+    copyBtn.onclick = async () => {
       await navigator.clipboard.writeText(decoded.text);
-      copyButton.textContent = "Copied";
-      setTimeout(() => (copyButton.textContent = "Copy"), 1500);
-    });
-    actions.appendChild(copyButton);
+      copyBtn.textContent = "Copied";
+      setTimeout(() => (copyBtn.textContent = "Copy"), 1200);
+    };
+    actions.appendChild(copyBtn);
 
     if (own && !message.deleted_at) {
-      const editButton = document.createElement("button");
-      editButton.type = "button";
-      editButton.textContent = "Edit";
-      editButton.addEventListener("click", () => editMessage(message));
-      actions.appendChild(editButton);
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.textContent = "Edit";
+      editBtn.onclick = () => editMessage(message);
+      actions.appendChild(editBtn);
 
-      const deleteButton = document.createElement("button");
-      deleteButton.type = "button";
-      deleteButton.textContent = "Delete";
-      deleteButton.addEventListener("click", () => deleteMessage(message));
-      actions.appendChild(deleteButton);
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.textContent = "Delete";
+      delBtn.onclick = () => deleteMessage(message);
+      actions.appendChild(delBtn);
     }
 
-    article.append(sender, content, time, actions);
+    article.appendChild(actions);
+
     container.appendChild(article);
     container.scrollTop = container.scrollHeight;
   }
@@ -404,9 +420,7 @@
 
     const decoded = decodeMessageBody(message.body);
     const content = existing.querySelector(".message-text");
-    const time = existing.querySelector(".message-time");
     if (content) content.textContent = message.deleted_at ? "This message was deleted." : decoded.text;
-    if (time) time.textContent = formatTime(message.created_at) + (message.edited_at ? " · edited" : "");
   }
 
   function removeMessage(id) {
@@ -419,7 +433,7 @@
     state.replyTarget = message.id;
     const decoded = decodeMessageBody(message.body);
     $("replyComposerPreview")?.classList.remove("hidden");
-    setText("replyPreviewText", decoded.text.slice(0, 100) || "Message");
+    setText("replyPreviewText", decoded.text.slice(0, 80) || "Message");
     $("messageInput")?.focus();
   }
 
@@ -435,10 +449,7 @@
     const text = input?.value.trim();
     if (!text || !state.room || !state.client) return;
 
-    if (text.length > CONFIG.MAX_MESSAGE_LENGTH) {
-      showError("chatError", "Message too long.");
-      return;
-    }
+    if (text.length > CONFIG.MAX_MESSAGE_LENGTH) return;
 
     const btn = $("sendBtn");
     if (btn) btn.disabled = true;
@@ -452,9 +463,7 @@
       if (error) throw error;
       input.value = "";
       cancelReply();
-    } catch (err) {
-      showError("chatError", "Send failed.");
-    } finally {
+    } catch {} finally {
       if (btn) btn.disabled = false;
       input?.focus();
     }
@@ -486,19 +495,11 @@
     } catch {}
   }
 
-  async function copyRoomCode() {
-    if (!state.roomCode) return;
-    await navigator.clipboard.writeText(state.roomCode);
-    setText("copyCodeBtn", "Copied!");
-    setTimeout(() => setText("copyCodeBtn", "Copy"), 1500);
-  }
-
   function showQrCode() {
     if (!state.roomCode) return;
     const url = new URL(location.href);
     url.searchParams.set("room", state.roomCode);
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url.href)}`;
-    $("qrImage").src = qrUrl;
+    $("qrImage").src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url.href)}`;
     $("qrModal")?.classList.remove("hidden");
   }
 
@@ -507,11 +508,10 @@
     const url = new URL(location.href);
     url.searchParams.set("room", state.roomCode);
     if (navigator.share) {
-      await navigator.share({ title: "NETBAND Room", text: `Join room: ${state.roomCode}`, url: url.href });
+      await navigator.share({ title: "NETBAND Room", text: `Join: ${state.roomCode}`, url: url.href });
     } else {
       await navigator.clipboard.writeText(url.href);
-      setText("roomShareStatus", "Link copied!");
-      setTimeout(() => setText("roomShareStatus", ""), 3000);
+      alert("Room link copied to clipboard!");
     }
   }
 
@@ -523,11 +523,12 @@
     });
   }
 
+  /* LiveKit Integration (Calls Dock) */
   async function requestLiveKitToken() {
     const { data, error } = await state.client.functions.invoke(CONFIG.TOKEN_FUNCTION, {
       body: { roomName: `netband-${state.room.id}`, participantName: state.senderName }
     });
-    if (error || !data?.token) throw new Error("LiveKit token request failed.");
+    if (error || !data?.token) throw new Error("LiveKit Token failed.");
     return data.token;
   }
 
@@ -535,6 +536,7 @@
     if (state.callConnecting || state.call) return;
     state.callConnecting = true;
     setText("callStatus", "Connecting...");
+    $("callOverlay")?.classList.remove("hidden");
 
     try {
       const token = await requestLiveKitToken();
@@ -548,19 +550,12 @@
       state.localTracks = tracks;
       for (const track of tracks) await call.localParticipant.publishTrack(track);
 
-      $("joinVoiceBtn").disabled = true;
-      $("joinVideoBtn").disabled = true;
-      $("muteBtn").disabled = false;
-      $("cameraBtn").disabled = false;
-      $("screenShareBtn").disabled = false;
-      $("leaveCallBtn").disabled = false;
-
       setText("callStatus", "Call connected");
-      updateParticipants();
+      $("screenShareBtn")?.classList.remove("hidden");
       updateVideoGrid();
     } catch (err) {
       await leaveCall();
-      showError("callError", err.message || "Call connect failed.");
+      alert("Call connect nahi hui. Check microphone/camera permissions.");
     } finally {
       state.callConnecting = false;
     }
@@ -568,151 +563,81 @@
 
   function registerCallEvents(call) {
     call
-      .on(livekitLibrary.RoomEvent.ParticipantConnected, () => { updateParticipants(); updateVideoGrid(); })
-      .on(livekitLibrary.RoomEvent.ParticipantDisconnected, p => { detachParticipant(p); updateParticipants(); updateVideoGrid(); })
-      .on(livekitLibrary.RoomEvent.TrackSubscribed, (t, pub, p) => attachTrack(t, p))
-      .on(livekitLibrary.RoomEvent.TrackUnsubscribed, (t, pub, p) => detachTrack(t, p))
-      .on(livekitLibrary.RoomEvent.TrackMuted, updateParticipants)
-      .on(livekitLibrary.RoomEvent.TrackUnmuted, updateParticipants)
+      .on(livekitLibrary.RoomEvent.ParticipantConnected, updateVideoGrid)
+      .on(livekitLibrary.RoomEvent.ParticipantDisconnected, p => {
+        $(`video-${p.identity}`)?.remove();
+        updateVideoGrid();
+      })
+      .on(livekitLibrary.RoomEvent.TrackSubscribed, (track, pub, participant) => {
+        if (track.kind === "audio") {
+          const el = track.attach();
+          el.style.display = "none";
+          document.body.appendChild(el);
+          return;
+        }
+        if (track.kind === "video") attachVideoTrack(track, participant);
+      })
+      .on(livekitLibrary.RoomEvent.TrackUnsubscribed, (track) => {
+        track.detach().forEach(el => el.remove());
+        updateVideoGrid();
+      })
       .on(livekitLibrary.RoomEvent.Disconnected, leaveCall);
   }
 
-  function attachTrack(track, participant) {
-    if (track.kind === "audio") {
-      const audioEl = track.attach();
-      audioEl.style.display = "none";
-      document.body.appendChild(audioEl);
-      return;
-    }
-    if (track.kind !== "video") return;
-
+  function attachVideoTrack(track, participant) {
     const grid = $("videoGrid");
     if (!grid) return;
-    $("videoEmpty")?.remove();
 
-    const key = participant.identity;
-    let tile = grid.querySelector(`[data-participant="${CSS.escape(key)}"]`);
+    let tile = $(`video-${participant.identity}`);
     if (!tile) {
       tile = document.createElement("div");
+      tile.id = `video-${participant.identity}`;
       tile.className = "video-tile";
-      tile.dataset.participant = key;
-      const name = document.createElement("div");
-      name.className = "video-label";
-      name.textContent = participant.name || participant.identity;
-      tile.appendChild(name);
+
+      const label = document.createElement("div");
+      label.className = "video-label";
+      label.textContent = participant.name || participant.identity;
+      tile.appendChild(label);
       grid.appendChild(tile);
     }
 
     const mediaEl = track.attach();
-    mediaEl.autoplay = true;
-    mediaEl.playsInline = true;
     tile.insertBefore(mediaEl, tile.firstChild);
-  }
-
-  function detachTrack(track, participant) {
-    track.detach().forEach(el => el.remove());
-    const tile = $("videoGrid")?.querySelector(`[data-participant="${CSS.escape(participant.identity)}"]`);
-    if (tile && !tile.querySelector("video")) tile.remove();
-    updateVideoGrid();
-  }
-
-  function detachParticipant(participant) {
-    $("videoGrid")?.querySelector(`[data-participant="${CSS.escape(participant.identity)}"]`)?.remove();
   }
 
   function updateVideoGrid() {
     if (!state.call) return;
-    const grid = $("videoGrid");
-    if (!grid) return;
-
     const local = state.call.localParticipant;
     if (local) {
-      const key = local.identity;
-      let tile = grid.querySelector(`[data-participant="${CSS.escape(key)}"]`);
-      if (!tile) {
-        tile = document.createElement("div");
-        tile.className = "video-tile";
-        tile.dataset.participant = key;
-        const name = document.createElement("div");
-        name.className = "video-label";
-        name.textContent = `${state.senderName} (You)`;
-        tile.appendChild(name);
-        grid.appendChild(tile);
-      }
-
       local.videoTrackPublications.forEach(pub => {
-        const track = pub.videoTrack;
-        if (track && !tile.querySelector("video")) {
-          $("videoEmpty")?.remove();
-          const el = track.attach();
-          el.autoplay = true;
-          el.playsInline = true;
-          tile.insertBefore(el, tile.firstChild);
-        }
+        if (pub.videoTrack) attachVideoTrack(pub.videoTrack, local);
       });
     }
-
-    if (!grid.querySelector(".video-tile") && !grid.querySelector("#videoEmpty")) {
-      const empty = document.createElement("div");
-      empty.id = "videoEmpty";
-      empty.className = "video-empty";
-      empty.innerHTML = `<span>◉</span><strong>No active call</strong><small>Join call to connect.</small>`;
-      grid.appendChild(empty);
-    }
-  }
-
-  function updateParticipants() {
-    const call = state.call;
-    const list = $("participantList");
-    if (!list) return;
-    list.replaceChildren();
-
-    if (!call) {
-      list.innerHTML = `<p class="muted small">No participants yet.</p>`;
-      setText("participantCount", "0");
-      return;
-    }
-
-    const participants = [call.localParticipant, ...call.remoteParticipants.values()];
-    setText("participantCount", String(participants.length));
-    participants.forEach(p => {
-      const row = document.createElement("div");
-      row.className = "participant-item";
-      const isYou = p === call.localParticipant;
-      row.textContent = `${p.name || p.identity} ${isYou ? "(You)" : ""} · ${p.isMicrophoneEnabled ? "🎤" : "🔇"}`;
-      list.appendChild(row);
-    });
   }
 
   async function toggleMicrophone() {
     if (!state.call) return;
     const enabled = state.call.localParticipant.isMicrophoneEnabled;
     await state.call.localParticipant.setMicrophoneEnabled(!enabled);
-    setText("muteBtn", enabled ? "Unmute mic" : "Mute mic");
-    updateParticipants();
+    setText("muteBtn", enabled ? "🎤 Unmute" : "🔇 Muted");
   }
 
   async function toggleCamera() {
     if (!state.call) return;
     const enabled = state.call.localParticipant.isCameraEnabled;
     await state.call.localParticipant.setCameraEnabled(!enabled);
-    setText("cameraBtn", enabled ? "Turn camera on" : "Turn camera off");
-    updateParticipants();
-    updateVideoGrid();
+    setText("cameraBtn", enabled ? "📷 Cam Off" : "📷 Cam On");
   }
 
-  /* Screen Share Feature */
   async function toggleScreenShare() {
     if (!state.call) return;
     try {
       state.isScreenSharing = !state.isScreenSharing;
       await state.call.localParticipant.setScreenShareEnabled(state.isScreenSharing);
-      setText("screenShareBtn", state.isScreenSharing ? "Stop sharing" : "🖥 Share screen");
-      updateVideoGrid();
+      setText("screenShareBtn", state.isScreenSharing ? "Stop" : "🖥");
     } catch {
       state.isScreenSharing = false;
-      setText("screenShareBtn", "🖥 Share screen");
-      showError("callError", "Screen share permissions denied.");
+      setText("screenShareBtn", "🖥");
     }
   }
 
@@ -726,21 +651,10 @@
     state.isScreenSharing = false;
     document.querySelectorAll("audio").forEach(el => el.remove());
 
-    $("joinVoiceBtn").disabled = false;
-    $("joinVideoBtn").disabled = false;
-    $("muteBtn").disabled = true;
-    $("cameraBtn").disabled = true;
-    $("screenShareBtn").disabled = true;
-    $("leaveCallBtn").disabled = true;
-
-    setText("muteBtn", "Mute mic");
-    setText("cameraBtn", "Turn camera on");
-    setText("screenShareBtn", "🖥 Share screen");
-    setText("callStatus", "Not in a call");
-
+    $("callOverlay")?.classList.add("hidden");
+    $("screenShareBtn")?.classList.add("hidden");
     $("videoGrid")?.replaceChildren();
-    updateVideoGrid();
-    updateParticipants();
+    setText("callStatus", "Not in a call");
   }
 
   async function leaveRoom() {
@@ -750,8 +664,10 @@
 
     state.room = null;
     state.roomCode = null;
-    $("chatPanel")?.classList.add("hidden");
-    $("setupPanel")?.classList.remove("hidden");
+
+    document.querySelector(".wa-app-window")?.classList.remove("in-chat");
+    $("activeChatWrapper")?.classList.add("hidden");
+    $("emptyPlaceholder")?.classList.remove("hidden");
 
     const url = new URL(location.href);
     url.searchParams.delete("room");
@@ -767,14 +683,12 @@
     $("messageInput")?.addEventListener("input", emitTyping);
 
     $("cancelReplyBtn")?.addEventListener("click", cancelReply);
-    $("copyCodeBtn")?.addEventListener("click", copyRoomCode);
     $("showQrBtn")?.addEventListener("click", showQrCode);
     $("closeQrBtn")?.addEventListener("click", () => $("qrModal")?.classList.add("hidden"));
     $("shareRoomBtn")?.addEventListener("click", shareRoom);
 
-    $("muteSoundBtn")?.addEventListener("click", () => {
-      state.soundEnabled = !state.soundEnabled;
-      setText("muteSoundBtn", state.soundEnabled ? "🔔 Sound: ON" : "🔕 Sound: OFF");
+    $("backToSidebarBtn")?.addEventListener("click", () => {
+      document.querySelector(".wa-app-window")?.classList.remove("in-chat");
     });
 
     $("messageSearch")?.addEventListener("input", e => searchMessages(e.target.value));
@@ -794,6 +708,10 @@
   async function start() {
     setNetworkStatus();
     setupEventListeners();
+
+    const avatarInitial = (state.senderName || "U").slice(0, 1).toUpperCase();
+    setText("myAvatar", avatarInitial);
+
     const params = new URLSearchParams(location.search);
     const code = params.get("room");
     if (code) {

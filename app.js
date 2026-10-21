@@ -37,6 +37,7 @@
     typingTimer: null
   };
 
+  /* Native Soft Tone Synthesizer */
   function playNotificationSound() {
     if (!state.soundEnabled) return;
     try {
@@ -78,7 +79,7 @@
   }
 
   function initializeBackend() {
-    if (!supabaseLibrary?.createClient) throw new Error("Supabase SDK load nahi hua.");
+    if (!supabaseLibrary?.createClient) throw new Error("Supabase SDK not loaded.");
     if (!state.client) {
       state.client = supabaseLibrary.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
     }
@@ -144,7 +145,6 @@
     }
   }
 
-  /* WhatsApp View Switcher */
   function showChat(room) {
     state.room = room;
     state.roomCode = room.code;
@@ -171,7 +171,7 @@
       if (remaining <= 0) {
         clearInterval(state.timer);
         leaveRoom();
-        showError("setupError", "Room expire ho chuka hai.");
+        showError("setupError", "Room expired. Create a new one.");
         return;
       }
       setText("expiryTitle", formatDuration(remaining));
@@ -201,10 +201,10 @@
         if (!String(error.message || "").toLowerCase().includes("duplicate")) throw error;
       }
 
-      if (!createdRoom) throw new Error("Room create fail hua.");
+      if (!createdRoom) throw new Error("Could not initialize room.");
       await connectToRoom(createdRoom);
     } catch (err) {
-      showError("setupError", err.message || "Room create nahi hua.");
+      showError("setupError", err.message || "Room creation failed.");
     } finally {
       setBusy(false);
     }
@@ -214,7 +214,7 @@
     if (state.busy) return;
     const roomCode = String(code || "").trim().toUpperCase();
     if (!/^[A-HJ-NP-Z2-9]{8}$/.test(roomCode)) {
-      showError("setupError", "8-character room code daalein.");
+      showError("setupError", "Please input a valid 8-char code.");
       return;
     }
 
@@ -231,10 +231,10 @@
         .maybeSingle();
 
       if (error) throw error;
-      if (!data) throw new Error("Room nahi mila ya expire ho gaya.");
+      if (!data) throw new Error("Room expired or not found.");
       await connectToRoom(data);
     } catch (err) {
-      showError("setupError", err.message || "Join failed.");
+      showError("setupError", err.message || "Room join failed.");
     } finally {
       setBusy(false);
     }
@@ -248,7 +248,7 @@
     state.messages.clear();
 
     showChat(room);
-    setText("chatStatus", "Connecting...");
+    setText("chatStatus", "Connecting…");
 
     try {
       const client = initializeBackend();
@@ -290,7 +290,7 @@
   function handleTypingIndicator(name) {
     const indicator = $("typingIndicator");
     if (!indicator) return;
-    setText("typingText", `${name || "Guest"} is typing...`);
+    setText("typingText", `${name || "Guest"} is typing…`);
     indicator.classList.remove("hidden");
 
     clearTimeout(state.typingTimer);
@@ -313,7 +313,18 @@
     });
   }
 
-  /* WhatsApp Style Message Bubble Builder */
+  /* WhatsApp SVG Double Tick */
+  function createDoubleTickSvg() {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 16 15");
+    svg.setAttribute("class", "message-ticks-svg");
+    svg.setAttribute("fill", "currentColor");
+    svg.innerHTML = `
+      <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"/>
+    `;
+    return svg;
+  }
+
   function renderMessage(message, isNew = false) {
     if (!message || message.id == null) return;
     const id = String(message.id);
@@ -344,7 +355,7 @@
     if (decoded.replyTo) {
       const reply = document.createElement("div");
       reply.className = "reply-quote";
-      reply.textContent = `Replying to message`;
+      reply.textContent = `Replying to #${decoded.replyTo}`;
       article.appendChild(reply);
     }
 
@@ -353,7 +364,7 @@
     content.textContent = message.deleted_at ? "This message was deleted." : decoded.text;
     article.appendChild(content);
 
-    // Meta row (WhatsApp Time + Blue Double Tick)
+    // Meta (Time + SVG Double Tick)
     const metaRow = document.createElement("div");
     metaRow.className = "message-meta-row";
 
@@ -362,45 +373,46 @@
     time.textContent = formatTime(message.created_at);
     metaRow.appendChild(time);
 
-    if (own) {
-      const tick = document.createElement("span");
-      tick.className = "message-tick";
-      tick.textContent = "✓✓";
-      metaRow.appendChild(tick);
+    if (own && !message.deleted_at) {
+      metaRow.appendChild(createDoubleTickSvg());
     }
 
     article.appendChild(metaRow);
 
-    // Message Actions (WhatsApp-like Quick Options on Hover)
+    // Context Action Controls
     const actions = document.createElement("div");
     actions.className = "message-actions";
 
     const replyBtn = document.createElement("button");
+    replyBtn.className = "msg-action-btn";
     replyBtn.type = "button";
-    replyBtn.textContent = "Reply";
+    replyBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg> Reply`;
     replyBtn.onclick = () => setReply(message);
     actions.appendChild(replyBtn);
 
     const copyBtn = document.createElement("button");
+    copyBtn.className = "msg-action-btn";
     copyBtn.type = "button";
-    copyBtn.textContent = "Copy";
+    copyBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy`;
     copyBtn.onclick = async () => {
       await navigator.clipboard.writeText(decoded.text);
       copyBtn.textContent = "Copied";
-      setTimeout(() => (copyBtn.textContent = "Copy"), 1200);
+      setTimeout(() => (copyBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy`), 1200);
     };
     actions.appendChild(copyBtn);
 
     if (own && !message.deleted_at) {
       const editBtn = document.createElement("button");
+      editBtn.className = "msg-action-btn";
       editBtn.type = "button";
-      editBtn.textContent = "Edit";
+      editBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg> Edit`;
       editBtn.onclick = () => editMessage(message);
       actions.appendChild(editBtn);
 
       const delBtn = document.createElement("button");
+      delBtn.className = "msg-action-btn";
       delBtn.type = "button";
-      delBtn.textContent = "Delete";
+      delBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Delete`;
       delBtn.onclick = () => deleteMessage(message);
       actions.appendChild(delBtn);
     }
@@ -448,7 +460,6 @@
     const input = $("messageInput");
     const text = input?.value.trim();
     if (!text || !state.room || !state.client) return;
-
     if (text.length > CONFIG.MAX_MESSAGE_LENGTH) return;
 
     const btn = $("sendBtn");
@@ -523,19 +534,19 @@
     });
   }
 
-  /* LiveKit Integration (Calls Dock) */
+  /* LiveKit Video & Audio Streaming */
   async function requestLiveKitToken() {
     const { data, error } = await state.client.functions.invoke(CONFIG.TOKEN_FUNCTION, {
       body: { roomName: `netband-${state.room.id}`, participantName: state.senderName }
     });
-    if (error || !data?.token) throw new Error("LiveKit Token failed.");
+    if (error || !data?.token) throw new Error("LiveKit Token failure.");
     return data.token;
   }
 
   async function joinCall(withVideo = false) {
     if (state.callConnecting || state.call) return;
     state.callConnecting = true;
-    setText("callStatus", "Connecting...");
+    setText("callStatus", "Connecting…");
     $("callOverlay")?.classList.remove("hidden");
 
     try {
@@ -555,7 +566,7 @@
       updateVideoGrid();
     } catch (err) {
       await leaveCall();
-      alert("Call connect nahi hui. Check microphone/camera permissions.");
+      alert("Call connection failed. Please ensure camera/mic permissions are granted.");
     } finally {
       state.callConnecting = false;
     }
@@ -619,14 +630,16 @@
     if (!state.call) return;
     const enabled = state.call.localParticipant.isMicrophoneEnabled;
     await state.call.localParticipant.setMicrophoneEnabled(!enabled);
-    setText("muteBtn", enabled ? "🎤 Unmute" : "🔇 Muted");
+    const span = $("muteBtn")?.querySelector("span");
+    if (span) span.textContent = enabled ? "Unmute" : "Muted";
   }
 
   async function toggleCamera() {
     if (!state.call) return;
     const enabled = state.call.localParticipant.isCameraEnabled;
     await state.call.localParticipant.setCameraEnabled(!enabled);
-    setText("cameraBtn", enabled ? "📷 Cam Off" : "📷 Cam On");
+    const span = $("cameraBtn")?.querySelector("span");
+    if (span) span.textContent = enabled ? "Cam On" : "Cam Off";
   }
 
   async function toggleScreenShare() {
@@ -634,10 +647,9 @@
     try {
       state.isScreenSharing = !state.isScreenSharing;
       await state.call.localParticipant.setScreenShareEnabled(state.isScreenSharing);
-      setText("screenShareBtn", state.isScreenSharing ? "Stop" : "🖥");
+      $("screenShareBtn")?.classList.toggle("danger", state.isScreenSharing);
     } catch {
       state.isScreenSharing = false;
-      setText("screenShareBtn", "🖥");
     }
   }
 
@@ -692,7 +704,7 @@
     });
 
     $("messageSearch")?.addEventListener("input", e => searchMessages(e.target.value));
-    $("leaveBtn")?.addEventListener("click", () => { if (confirm("Leave room?")) leaveRoom(); });
+    $("leaveBtn")?.addEventListener("click", () => { if (confirm("Leave this temporary space?")) leaveRoom(); });
 
     $("joinVoiceBtn")?.addEventListener("click", () => joinCall(false));
     $("joinVideoBtn")?.addEventListener("click", () => joinCall(true));

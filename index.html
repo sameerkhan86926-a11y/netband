@@ -51,7 +51,7 @@
         <span>◈ No account</span>
         <span>◷ 30-minute rooms</span>
         <span>⌁ Realtime messaging</span>
-        <span>◉ Voice & video</span>
+        <span>◉ Voice, video & screen</span>
       </div>
     </section>
 
@@ -103,9 +103,8 @@
           <div class="room-meta">
             <span>CODE:</span>
             <strong id="roomCodeDisplay">--------</strong>
-            <button id="copyCodeBtn" class="btn-text" type="button">
-              Copy code
-            </button>
+            <button id="copyCodeBtn" class="btn-text" type="button">Copy</button>
+            <button id="showQrBtn" class="btn-text" type="button">QR Code</button>
           </div>
         </div>
 
@@ -116,7 +115,10 @@
 
       <div class="extra-tools">
         <button id="shareRoomBtn" class="tool-button" type="button">
-          🔗 Share room
+          🔗 Share link
+        </button>
+        <button id="muteSoundBtn" class="tool-button" type="button">
+          🔔 Sound: ON
         </button>
       </div>
 
@@ -137,18 +139,18 @@
         </div>
       </div>
 
-      <!-- VOICE & VIDEO PANEL -->
+      <!-- VOICE, VIDEO & SCREEN SHARE PANEL -->
       <section class="call-panel">
         <div class="call-header">
           <div>
             <span class="step-label">03 / LIVE CALL</span>
-            <h3>Voice & video</h3>
+            <h3>Voice, video & screen</h3>
           </div>
           <span id="callStatus" class="call-status">Not in a call</span>
         </div>
 
         <p class="call-help">
-          Join the call to speak with members. Camera and microphone permissions will be requested.
+          Join the call to speak with members or share your display screen.
         </p>
 
         <div class="call-actions">
@@ -164,6 +166,9 @@
           <button id="cameraBtn" class="btn btn-ghost" type="button" disabled>
             Turn camera on
           </button>
+          <button id="screenShareBtn" class="btn btn-ghost" type="button" disabled>
+            🖥 Share screen
+          </button>
           <button id="leaveCallBtn" class="btn btn-danger" type="button" disabled>
             Leave call
           </button>
@@ -174,7 +179,7 @@
             <div id="videoEmpty" class="video-empty">
               <span class="empty-icon">◉</span>
               <strong>No active call</strong>
-              <small>Join voice or video to connect with members.</small>
+              <small>Join voice, video or screen share to connect.</small>
             </div>
           </div>
 
@@ -215,8 +220,14 @@
         <div class="empty-state">
           <span>✧</span>
           <strong>Your conversation starts here</strong>
-          <p>Share the room code with the person you want to chat with.</p>
+          <p>Share the room code or QR with the person you want to chat with.</p>
         </div>
+      </div>
+
+      <!-- TYPING INDICATOR -->
+      <div id="typingIndicator" class="typing-indicator hidden">
+        <span class="typing-dots"><span></span><span></span><span></span></span>
+        <span id="typingText">Someone is typing...</span>
       </div>
 
       <!-- REPLY PREVIEW -->
@@ -244,23 +255,6 @@
         </button>
       </form>
 
-      <!-- ATTACHMENTS & EXTRA TOOLS -->
-      <div class="composer-extra">
-        <button id="attachmentBtn" class="tool-button" type="button">📎 Attach file</button>
-        <button id="voiceMessageBtn" class="tool-button" type="button">🎙 Voice message</button>
-      </div>
-
-      <input
-        id="attachmentInput"
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif,audio/webm,audio/mp4,audio/ogg,audio/mpeg,application/pdf,text/plain,application/zip"
-        hidden
-      >
-
-      <p class="attachment-note">
-        Files up to 10MB supported. Uploaded content expires along with the room.
-      </p>
-
       <div class="chat-footer">
         <span id="chatStatus">Connecting…</span>
         <span>End-to-end ephemeral session</span>
@@ -269,24 +263,36 @@
       <p id="chatError" class="error" aria-live="polite"></p>
     </section>
 
+    <!-- QR CODE MODAL -->
+    <div id="qrModal" class="modal-backdrop hidden">
+      <div class="modal-box">
+        <h3>Scan to join room</h3>
+        <p class="muted small">Scan this code using any phone camera to join instantly.</p>
+        <div class="qr-container">
+          <img id="qrImage" src="" alt="Room QR Code" width="180" height="180">
+        </div>
+        <button id="closeQrBtn" class="btn secondary full-width" type="button">Close</button>
+      </div>
+    </div>
+
     <!-- INFO CARDS -->
     <section class="info-grid">
       <article class="info-card">
         <span class="info-icon">⌁</span>
         <h3>Simple connection</h3>
-        <p>Create a room, share its code, and start messaging or calling instantly.</p>
+        <p>Create a room, share its code or QR, and start messaging or calling instantly.</p>
       </article>
 
       <article class="info-card">
         <span class="info-icon">◷</span>
         <h3>Temporary by design</h3>
-        <p>Rooms and data disappear automatically once the countdown ends.</p>
+        <p>Rooms and data disappear automatically once the 30-minute countdown ends.</p>
       </article>
 
       <article class="info-card">
         <span class="info-icon">⌘</span>
-        <h3>Realtime peer-to-peer</h3>
-        <p>Direct low-latency communication powered by modern web standards.</p>
+        <h3>Voice, video & screen</h3>
+        <p>Low latency WebRTC streaming powered by LiveKit engine.</p>
       </article>
     </section>
 
@@ -299,69 +305,5 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.15.6/dist/livekit-client.umd.min.js"></script>
   <script src="app.js"></script>
-
-  <script>
-    (() => {
-      const $ = id => document.getElementById(id);
-
-      $("shareRoomBtn")?.addEventListener("click", async () => {
-        const code = $("roomCodeDisplay")?.textContent?.trim();
-        if (!code || code === "--------") {
-          $("roomShareStatus").textContent = "Pehle room create ya join karein.";
-          return;
-        }
-
-        const url = new URL(location.href);
-        url.searchParams.set("room", code);
-
-        try {
-          if (navigator.share) {
-            await navigator.share({
-              title: "Join my NETBAND room",
-              text: `Room code: ${code}`,
-              url: url.href
-            });
-          } else {
-            await navigator.clipboard.writeText(url.href);
-            $("roomShareStatus").textContent = "Room link copied to clipboard!";
-          }
-        } catch (error) {
-          if (error.name !== "AbortError") {
-            $("roomShareStatus").textContent = "Link share nahi ho saka.";
-          }
-        }
-      });
-
-      $("messageSearch")?.addEventListener("input", event => {
-        const term = event.target.value.toLowerCase();
-        document.querySelectorAll("#chatMessages .message").forEach(message => {
-          const text = message.querySelector(".message-text")?.textContent || "";
-          message.classList.toggle("hidden", !text.toLowerCase().includes(term));
-        });
-      });
-
-      $("attachmentBtn")?.addEventListener("click", () => {
-        $("attachmentInput")?.click();
-      });
-
-      $("attachmentInput")?.addEventListener("change", event => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        if (file.size > 10 * 1024 * 1024) {
-          alert("File maximum 10 MB ki honi chahiye.");
-          event.target.value = "";
-          return;
-        }
-
-        alert("File selected: " + file.name + "\n(App upload handler ko attach karein)");
-        event.target.value = "";
-      });
-
-      $("voiceMessageBtn")?.addEventListener("click", () => {
-        alert("Voice message recording feature initialize ho raha hai...");
-      });
-    })();
-  </script>
 </body>
 </html>

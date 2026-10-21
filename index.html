@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08111f">
+  <title>NETBAND — Private Temporary Chat</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+  <header class="topbar">
+    <a class="brand" href="./"><span class="brand-mark">N</span><span>NETBAND<small>PRIVATE • TEMPORARY • SIMPLE</small></span></a>
+    <div class="status"><i id="onlineDot"></i><span id="networkLabel">Checking connection…</span></div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div class="eyebrow"><span class="pulse"></span> TEMPORARY COMMUNICATION</div>
+      <h1>Your space.<br><span>Your conversation.</span></h1>
+      <p>Create a room, share its code, and chat without creating an account. Rooms are designed to expire after 30 minutes.</p>
+      <div class="hero-pills"><span>◈ No account</span><span>◷ 30-minute rooms</span><span>⌁ Realtime when configured</span></div>
+    </section>
+
+    <section class="panel setup-panel" id="setupPanel">
+      <div class="panel-heading"><div><span class="step">01 / CONNECT</span><h2>Start a temporary room</h2></div><span class="lock-icon">⌑</span></div>
+      <p class="muted">Create a new room or join one using a room code from your friend.</p>
+      <div class="button-row"><button id="createBtn" class="button primary">＋ Create room</button></div>
+      <div class="divider"><span>OR JOIN A ROOM</span></div>
+      <form id="joinForm" class="join-row"><label class="sr-only" for="roomInput">Room code</label><input id="roomInput" maxlength="8" autocomplete="off" placeholder="ENTER ROOM CODE" required><button class="button secondary" type="submit">Join room ↗</button></form>
+      <details class="config">
+        <summary>Backend setup (one-time)</summary>
+        <p class="muted small">To send messages between different phones, connect a Supabase project. These settings are saved only in this browser. Never paste a service-role/secret key here.</p>
+        <label for="supabaseUrl">Supabase Project URL</label><input id="supabaseUrl" type="url" placeholder="https://your-project.supabase.co" autocomplete="off">
+        <label for="supabaseKey">Supabase publishable / anon key</label><input id="supabaseKey" type="password" placeholder="sb_publishable_… or legacy anon key" autocomplete="off">
+        <button id="saveConfigBtn" class="button secondary full">Save connection settings</button>
+        <p id="configStatus" class="small muted" aria-live="polite">Backend not configured.</p>
+      </details>
+      <p id="setupError" class="error" aria-live="polite"></p>
+    </section>
+
+    <section class="panel chat-panel hidden" id="chatPanel">
+      <div class="chat-top">
+        <div><span class="step">02 / LIVE ROOM</span><h2 id="chatTitle">Temporary room</h2><div class="room-meta">CODE <strong id="roomCodeDisplay">--------</strong> <button id="copyCodeBtn" class="text-button">Copy</button></div></div>
+        <button id="leaveBtn" class="button ghost">Leave</button>
+      </div>
+      <div class="expiry"><span>◷</span><div><strong id="expiryTitle">Room expires in 30:00</strong><small>Messages are temporary. Save anything important yourself.</small></div><div class="expiry-track"><span id="expiryBar"></span></div></div>
+      <div id="chatMessages" class="messages" role="log" aria-live="polite"><div class="empty-state"><span>✧</span><strong>Your conversation starts here</strong><p>Share the room code with the person you want to chat with.</p></div></div>
+      <form id="messageForm" class="composer"><label class="sr-only" for="messageInput">Message</label><input id="messageInput" maxlength="2000" placeholder="Write a message…" autocomplete="off" required><button class="send-button" aria-label="Send message" type="submit">↑</button></form>
+      <div class="chat-footer"><span id="chatStatus">Not connected</span><span>Never share sensitive information.</span></div>
+      <p id="chatError" class="error" aria-live="polite"></p>
+    </section>
+
+    <section class="info-grid">
+      <article class="info-card"><span class="info-icon">⌁</span><h3>Works honestly</h3><p>Realtime chat needs an internet connection and a configured backend. Offline mode does not magically deliver messages.</p></article>
+      <article class="info-card"><span class="info-icon">◷</span><h3>Temporary by design</h3><p>Rooms expire after 30 minutes. Server-side cleanup must be enabled using the SQL setup instructions.</p></article>
+      <article class="info-card"><span class="info-icon">⌘</span><h3>Offline-ready shell</h3><p>The website shell can load offline. Chatting between phones requires a network; nearby offline messaging is a separate future feature.</p></article>
+    </section>
+    <footer><span>NETBAND <span class="copyright">/</span> EARLY ACCESS</span><span>Built for connection, designed with care.</span></footer>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -3,1372 +3,1153 @@
 
   const $ = (id) => document.getElementById(id);
 
-  // ==========================================
-  // CONFIGURATION
-  // ==========================================
-
-  const config = {
-    url: "https://frjzfmskbkcogeeqytjm.supabase.co",
-    key: "sb_publishable_CIl_axgZv5JixyEKj_-d5A_xypfty-U",
-
-    // LiveKit Cloud WebSocket URL
-    livekitUrl: "wss://netband-oxhvo3gt.livekit.cloud",
-
-    // Supabase Edge Function that issues LiveKit tokens
-    tokenEndpoint:
-      "https://frjzfmskbkcogeeqytjm.supabase.co/functions/v1/smooth-handler"
+  const CONFIG = {
+    SUPABASE_URL: "https://frjzfmskbkcogeeqytjm.supabase.co",
+    SUPABASE_KEY: "sb_publishable_CIl_axgZv5JixyEKj_-d5A_xypfty-U",
+    LIVEKIT_URL: "wss://netband-oxhvo3gt.livekit.cloud",
+    TOKEN_FUNCTION: "smooth-handler",
+    ROOM_DURATION: 30 * 60 * 1000,
+    MAX_MESSAGE_LENGTH: 2000
   };
 
-  const MESSAGE_PREFIX = "__NETBAND_V2__:";
+  const supabaseLibrary = window.supabase;
+  const livekitLibrary = window.LivekitClient;
 
   const state = {
     client: null,
-    room: null,
     channel: null,
-    timer: null,
+    room: null,
+    roomCode: null,
     expiresAt: null,
-    seen: new Set(),
+    timer: null,
     senderId: getSenderId(),
-    busy: false,
+    senderName: getSenderName(),
+    seen: new Set(),
     replyTarget: null,
-
-    // LiveKit
-    callRoom: null,
+    messages: new Map(),
+    call: null,
     callConnecting: false,
-    callMode: null,
-    micEnabled: false,
-    cameraEnabled: false,
-    localIdentity: null
+    busy: false,
+    searchTerm: "",
+    localTracks: [],
+    renderedParticipants: new Set()
   };
 
-  // ==========================================
-  // SESSION ID
-  // ==========================================
-
   function getSenderId() {
-    try {
-      let id = sessionStorage.getItem("netband_sender_id");
+    const key = "netband_sender_id";
 
-      if (!id) {
-        id = crypto.randomUUID();
-        sessionStorage.setItem("netband_sender_id", id);
-      }
+    let id = sessionStorage.getItem(key);
 
-      return id;
-    } catch {
-      return crypto.randomUUID();
+    if (!id) {
+      id = crypto.randomUUID();
+      sessionStorage.setItem(key, id);
     }
+
+    return id;
   }
 
-  // ==========================================
-  // NETWORK STATUS
-  // ==========================================
+  function getSenderName() {
+    let name = sessionStorage.getItem("netband_name");
 
-  function setNetwork() {
-    const online = navigator.onLine;
-
-    $("networkLabel").textContent =
-      online ? "Internet available" : "Offline";
-
-    $("onlineDot").classList.toggle("online", online);
-    $("onlineDot").classList.toggle("offline", !online);
-
-    if (!state.room) return;
-
-    if (!online) {
-      $("chatStatus").textContent = "Offline · messages cannot be sent";
-    } else if (!state.channel) {
-      $("chatStatus").textContent = "Internet available · reconnecting";
+    if (!name) {
+      name = `Guest-${Math.random().toString(36).slice(2, 6)}`;
+      sessionStorage.setItem("netband_name", name);
     }
+
+    return name;
   }
 
-  window.addEventListener("online", setNetwork);
-  window.addEventListener("offline", setNetwork);
-
-  setNetwork();
-
-  // ==========================================
-  // SUPABASE
-  // ==========================================
-
-  function backendReady() {
-    if (!window.supabase?.createClient) {
-      throw new Error(
-        "Chat service could not load. Check your internet and refresh."
-      );
-    }
-
-    if (
-      !config.url.startsWith("https://") ||
-      !config.key ||
-      config.key === "SUPABASE_PUBLISHABLE_KEY"
-    ) {
-      throw new Error("Check your Supabase configuration.");
+  function initializeBackend() {
+    if (!supabaseLibrary?.createClient) {
+      throw new Error("Supabase SDK load nahi hua. Page refresh karo.");
     }
 
     if (!state.client) {
-      state.client = window.supabase.createClient(
-        config.url,
-        config.key
+      state.client = supabaseLibrary.createClient(
+        CONFIG.SUPABASE_URL,
+        CONFIG.SUPABASE_KEY
       );
     }
 
     return state.client;
   }
 
-  // ==========================================
-  // ROOM CODE
-  // ==========================================
+  function setText(id, text) {
+    const element = $(id);
+    if (element) element.textContent = text;
+  }
+
+  function showError(id, message = "") {
+    setText(id, message);
+  }
+
+  function setBusy(value) {
+    state.busy = value;
+
+    if ($("createBtn")) $("createBtn").disabled = value;
+    if ($("roomInput")) $("roomInput").disabled = value;
+    if ($("joinForm")) {
+      const button = $("joinForm").querySelector('button[type="submit"]');
+      if (button) button.disabled = value;
+    }
+  }
 
   function generateRoomCode() {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    const bytes = crypto.getRandomValues(new Uint8Array(8));
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
 
-    return Array.from(
-      bytes,
-      (byte) => chars[byte % chars.length]
-    ).join("");
+    return Array.from(bytes, byte => chars[byte % chars.length]).join("");
   }
 
-  // ==========================================
-  // ERROR DISPLAY
-  // ==========================================
-
-  function showError(id, message) {
-    const element = $(id);
-
-    if (element) {
-      element.textContent = message || "";
-    }
-  }
-
-  // ==========================================
-  // MESSAGE ENCODING
-  // ==========================================
-
-  function encodeMessageBody(text, replyTo) {
-    if (!replyTo) return text;
-
-    return MESSAGE_PREFIX + JSON.stringify({
-      text,
-      replyTo: {
-        id: replyTo.id,
-        text: String(replyTo.text || "").slice(0, 300)
-      }
-    });
-  }
-
-  function parseMessageBody(rawBody) {
-    const text = String(rawBody || "");
-
-    if (text.startsWith(MESSAGE_PREFIX)) {
-      try {
-        const parsed = JSON.parse(text.slice(MESSAGE_PREFIX.length));
-
-        if (parsed && typeof parsed.text === "string") {
-          return {
-            text: parsed.text,
-            replyTo: parsed.replyTo || null
-          };
-        }
-      } catch {
-        // Malformed metadata is shown as ordinary text.
-      }
-    }
-
-    return { text, replyTo: null };
-  }
-
-  // ==========================================
-  // EMPTY STATE
-  // ==========================================
-
-  function showEmptyState() {
-    const container = $("chatMessages");
-
-    if (!container || container.querySelector(".message")) return;
-
-    container.replaceChildren();
-
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-
-    const icon = document.createElement("span");
-    icon.textContent = "✧";
-
-    const title = document.createElement("strong");
-    title.textContent = "Your conversation starts here";
-
-    const description = document.createElement("p");
-    description.textContent =
-      "Share the room code with the person you want to chat with.";
-
-    empty.append(icon, title, description);
-    container.appendChild(empty);
-  }
-
-  // ==========================================
-  // COPY TEXT
-  // ==========================================
-
-  async function copyText(text) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      const textarea = document.createElement("textarea");
-
-      textarea.value = text;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-
-      document.body.appendChild(textarea);
-      textarea.select();
-
-      let copied = false;
-
-      try {
-        copied = document.execCommand("copy");
-      } catch {
-        copied = false;
-      }
-
-      textarea.remove();
-
-      if (!copied) {
-        window.prompt("Copy this text:", text);
-      }
-
-      return copied;
-    }
-  }
-
-  // ==========================================
-  // REPLIES
-  // ==========================================
-
-  function setReplyTarget(message, text) {
-    state.replyTarget = {
-      id: message.id,
-      text: String(text || "").slice(0, 300)
-    };
-
-    $("replyPreviewText").textContent = state.replyTarget.text;
-    $("replyComposerPreview").classList.remove("hidden");
-    $("messageInput").focus();
-  }
-
-  function clearReplyTarget() {
-    state.replyTarget = null;
-
-    $("replyComposerPreview").classList.add("hidden");
-    $("replyPreviewText").textContent = "";
-  }
-
-  $("cancelReplyBtn").addEventListener("click", clearReplyTarget);
-
-  // ==========================================
-  // RENDER MESSAGE
-  // ==========================================
-
-  function renderMessage(message) {
-    if (!message || state.seen.has(message.id)) return;
-
-    state.seen.add(message.id);
-
-    const container = $("chatMessages");
-    const empty = container.querySelector(".empty-state");
-
-    if (empty) empty.remove();
-
-    const parsed = parseMessageBody(message.body);
-
-    const div = document.createElement("article");
-
-    div.className =
-      "message" +
-      (message.sender_id === state.senderId ? " mine" : "");
-
-    div.dataset.messageId = String(message.id);
-
-    const sender = document.createElement("div");
-    sender.className = "sender";
-    sender.textContent =
-      message.sender_id === state.senderId ? "YOU" : "ROOM MEMBER";
-
-    div.appendChild(sender);
-
-    if (parsed.replyTo) {
-      const quote = document.createElement("div");
-      quote.className = "reply-preview";
-
-      const quoteLabel = document.createElement("strong");
-      quoteLabel.textContent = "↩ Replying to";
-
-      const quoteText = document.createElement("span");
-      quoteText.textContent = parsed.replyTo.text || "Message";
-
-      quote.append(quoteLabel, quoteText);
-      div.appendChild(quote);
-    }
-
-    const body = document.createElement("div");
-    body.className = "body";
-    body.textContent = parsed.text;
-
-    div.appendChild(body);
-
-    const footer = document.createElement("div");
-    footer.className = "message-actions";
-
-    const date = new Date(message.created_at || Date.now());
-
-    const time = document.createElement("time");
-    time.dateTime = date.toISOString();
-
-    time.textContent = date.toLocaleTimeString([], {
+  function formatTime(value) {
+    return new Date(value).toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit"
     });
-
-    const actions = document.createElement("div");
-    actions.className = "message-buttons";
-
-    const replyBtn = document.createElement("button");
-    replyBtn.type = "button";
-    replyBtn.className = "message-action";
-    replyBtn.textContent = "↩ Reply";
-
-    replyBtn.addEventListener("click", () => {
-      setReplyTarget(message, parsed.text);
-    });
-
-    const copyBtn = document.createElement("button");
-    copyBtn.type = "button";
-    copyBtn.className = "message-action";
-    copyBtn.textContent = "Copy";
-
-    copyBtn.addEventListener("click", async () => {
-      await copyText(parsed.text);
-
-      copyBtn.textContent = "Copied!";
-
-      setTimeout(() => {
-        copyBtn.textContent = "Copy";
-      }, 1200);
-    });
-
-    actions.append(replyBtn, copyBtn);
-    footer.append(time, actions);
-    div.appendChild(footer);
-
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
   }
 
-  // ==========================================
-  // ROOM UI
-  // ==========================================
+  function formatDuration(ms) {
+    const seconds = Math.max(0, Math.ceil(ms / 1000));
+    const minutes = Math.floor(seconds / 60);
+    const remaining = seconds % 60;
+
+    return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, char => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[char]);
+  }
+
+  function decodeMessageBody(body) {
+    const prefix = "__NETBAND_V2__:";
+
+    if (typeof body !== "string" || !body.startsWith(prefix)) {
+      return { text: body || "", replyTo: null };
+    }
+
+    try {
+      const data = JSON.parse(body.slice(prefix.length));
+
+      return {
+        text: typeof data.text === "string" ? data.text : "",
+        replyTo: data.replyTo || null
+      };
+    } catch {
+      return { text: body, replyTo: null };
+    }
+  }
+
+  function encodeMessageBody(text, replyTo = null) {
+    return "__NETBAND_V2__:" + JSON.stringify({
+      text,
+      replyTo
+    });
+  }
+
+  function setNetworkStatus() {
+    const online = navigator.onLine;
+
+    setText(
+      "networkLabel",
+      online ? "Internet connected" : "You're offline"
+    );
+
+    const dot = $("onlineDot");
+
+    if (dot) {
+      dot.classList.toggle("online", online);
+      dot.classList.toggle("offline", !online);
+    }
+  }
+
+  function setChatStatus(text) {
+    setText("chatStatus", text);
+  }
 
   function showChat(room) {
     state.room = room;
+    state.roomCode = room.code;
     state.expiresAt = new Date(room.expires_at).getTime();
 
-    $("setupPanel").classList.add("hidden");
-    $("chatPanel").classList.remove("hidden");
+    $("setupPanel")?.classList.add("hidden");
+    $("chatPanel")?.classList.remove("hidden");
 
-    $("roomCodeDisplay").textContent = room.code;
-    $("chatTitle").textContent = "Temporary room";
+    setText("chatTitle", "Temporary room");
+    setText("roomCodeDisplay", room.code);
 
-    $("chatMessages").replaceChildren();
-    state.seen.clear();
+    const shareUrl = new URL(location.href);
+    shareUrl.searchParams.set("room", room.code);
 
-    clearReplyTarget();
-    showEmptyState();
+    history.replaceState({}, "", shareUrl);
 
-    $("chatStatus").textContent = "Connecting…";
-
-    startTimer();
+    startExpiryTimer();
   }
 
-  // ==========================================
-  // ROOM TIMER
-  // ==========================================
-
-  function startTimer() {
+  function startExpiryTimer() {
     clearInterval(state.timer);
 
-    const tick = async () => {
-      if (!state.room || !state.expiresAt) {
+    function update() {
+      const remaining = state.expiresAt - Date.now();
+
+      if (remaining <= 0) {
         clearInterval(state.timer);
+        setText("expiryTitle", "Room time has ended");
+        setText("expiryBar", "");
+        leaveRoom();
+        showError("chatError", "Room expire ho gaya. Naya room create karo.");
         return;
       }
 
-      const remaining = Math.max(0, state.expiresAt - Date.now());
+      setText("expiryTitle", `Room expires in ${formatDuration(remaining)}`);
 
-      const minutes = Math.floor(remaining / 60000);
-      const seconds = Math.floor((remaining % 60000) / 1000);
-
-      $("expiryTitle").textContent =
-        remaining > 0
-          ? `Room expires in ${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
-          : "Room expired";
-
-      $("expiryBar").style.width =
-        `${Math.min(100, (remaining / 1800000) * 100)}%`;
-
-      if (remaining <= 0) {
-        await leaveRoom(true);
-
-        alert("This room has expired. Create a new room to continue.");
+      if ($("expiryBar")) {
+        $("expiryBar").style.width =
+          `${Math.min(100, remaining / CONFIG.ROOM_DURATION * 100)}%`;
       }
-    };
+    }
 
-    tick();
-    state.timer = setInterval(tick, 1000);
+    update();
+    state.timer = setInterval(update, 1000);
   }
 
-  // ==========================================
-  // CREATE / JOIN ROOM
-  // ==========================================
-
-  async function connectRoom(roomCode, createNew) {
+  async function createRoom() {
     if (state.busy) return;
 
-    state.busy = true;
-
-    showError("setupError", "");
-    showError("chatError", "");
-
-    $("createBtn").disabled = true;
+    setBusy(true);
+    showError("setupError");
 
     try {
-      const client = backendReady();
-      let room;
+      const client = initializeBackend();
 
-      if (createNew) {
+      let createdRoom = null;
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const code = generateRoomCode();
+
         const { data, error } = await client
           .from("rooms")
-          .insert({ code: generateRoomCode() })
+          .insert({
+            code,
+            expires_at: new Date(Date.now() + CONFIG.ROOM_DURATION).toISOString()
+          })
           .select("id,code,created_at,expires_at")
           .single();
 
-        if (error) throw error;
-        room = data;
-      } else {
-        const normalizedCode = roomCode.trim().toUpperCase();
-
-        if (!/^[A-HJ-NP-Z2-9]{8}$/.test(normalizedCode)) {
-          throw new Error("Enter a valid 8-character room code.");
+        if (!error) {
+          createdRoom = data;
+          break;
         }
 
-        const { data, error } = await client
-          .from("rooms")
-          .select("id,code,created_at,expires_at")
-          .eq("code", normalizedCode)
-          .gt("expires_at", new Date().toISOString())
-          .maybeSingle();
-
-        if (error) throw error;
-
-        if (!data) {
-          throw new Error("Room not found or expired. Check the code.");
+        if (!String(error.message || "").toLowerCase().includes("duplicate")) {
+          throw error;
         }
-
-        room = data;
       }
 
-      if (
-        !room ||
-        !room.expires_at ||
-        new Date(room.expires_at).getTime() <= Date.now()
-      ) {
-        throw new Error("This room has expired.");
+      if (!createdRoom) {
+        throw new Error("Room create nahi hua. Dobara try karo.");
       }
 
-      if (state.callRoom) {
-        await leaveCall();
-      }
-
-      if (state.channel) {
-        await client.removeChannel(state.channel);
-        state.channel = null;
-      }
-
-      showChat(room);
-
-      const { data: messages, error: fetchError } = await client
-        .from("messages")
-        .select("id,room_id,sender_id,body,created_at")
-        .eq("room_id", room.id)
-        .order("created_at", { ascending: true })
-        .limit(200);
-
-      if (fetchError) throw fetchError;
-
-      (messages || []).forEach(renderMessage);
-
-      state.channel = client
-        .channel("room-" + room.id)
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "messages",
-            filter: "room_id=eq." + room.id
-          },
-          (payload) => {
-            if (
-              state.room &&
-              payload.new &&
-              payload.new.room_id === state.room.id
-            ) {
-              renderMessage(payload.new);
-            }
-          }
-        )
-        .subscribe((status) => {
-          if (status === "SUBSCRIBED") {
-            $("chatStatus").textContent = "Connected · realtime active";
-          } else if (
-            status === "CHANNEL_ERROR" ||
-            status === "TIMED_OUT"
-          ) {
-            $("chatStatus").textContent = "Realtime connection error";
-          } else {
-            $("chatStatus").textContent =
-              "Connection: " + status.toLowerCase();
-          }
-        });
-
-      setNetwork();
-
+      await connectToRoom(createdRoom);
     } catch (error) {
-      showError(
-        "setupError",
-        error.message || "Could not connect. Check your Supabase settings."
-      );
+      console.error("Create room:", error);
+      showError("setupError", error.message || "Room create nahi ho saka.");
     } finally {
-      state.busy = false;
-      $("createBtn").disabled = false;
+      setBusy(false);
     }
   }
 
-  $("createBtn").addEventListener("click", () => {
-    connectRoom("", true);
-  });
+  async function joinRoom(code) {
+    if (state.busy) return;
 
-  $("joinForm").addEventListener("submit", (event) => {
-    event.preventDefault();
-    connectRoom($("roomInput").value, false);
-  });
+    const roomCode = String(code || "").trim().toUpperCase();
 
-  // ==========================================
-  // SEND MESSAGE
-  // ==========================================
-
-  $("messageForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    showError("chatError", "");
-
-    const input = $("messageInput");
-    const body = input.value.trim();
-
-    if (!body || !state.room) return;
-
-    if (!navigator.onLine) {
-      showError("chatError", "You are offline. Message not sent.");
+    if (!/^[A-HJ-NP-Z2-9]{8}$/.test(roomCode)) {
+      showError("setupError", "8-character ka valid room code enter karo.");
       return;
     }
 
-    if (Date.now() >= state.expiresAt) {
-      showError("chatError", "This room has expired.");
-      return;
-    }
-
-    $("sendBtn").disabled = true;
+    setBusy(true);
+    showError("setupError");
 
     try {
-      const client = backendReady();
+      const client = initializeBackend();
 
-      const { error } = await client
+      const { data, error } = await client
+        .from("rooms")
+        .select("id,code,created_at,expires_at")
+        .eq("code", roomCode)
+        .gt("expires_at", new Date().toISOString())
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!data) {
+        throw new Error("Room nahi mila ya room expire ho chuka hai.");
+      }
+
+      await connectToRoom(data);
+    } catch (error) {
+      console.error("Join room:", error);
+      showError("setupError", error.message || "Room join nahi hua.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function connectToRoom(room) {
+    await disconnectRealtime();
+
+    state.room = room;
+    state.roomCode = room.code;
+    state.seen.clear();
+    state.messages.clear();
+
+    showChat(room);
+    setChatStatus("Connecting...");
+
+    try {
+      const client = initializeBackend();
+
+      const { data, error } = await client
+        .from("messages")
+        .select("id,room_id,sender_id,body,created_at,edited_at,deleted_at,reply_to,message_type,reactions")
+        .eq("room_id", room.id)
+        .order("created_at", { ascending: true })
+        .limit(300);
+
+      if (error) throw error;
+
+      (data || []).forEach(renderMessage);
+
+      state.channel = client
+        .channel(`netband-room-${room.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "messages",
+            filter: `room_id=eq.${room.id}`
+          },
+          payload => {
+            if (payload.eventType === "INSERT") {
+              renderMessage(payload.new);
+            } else if (payload.eventType === "UPDATE") {
+              updateMessage(payload.new);
+            } else if (payload.eventType === "DELETE") {
+              removeMessage(payload.old.id);
+            }
+          }
+        )
+        .subscribe(status => {
+          if (status === "SUBSCRIBED") {
+            setChatStatus("Connected · Realtime");
+          } else if (status === "CHANNEL_ERROR") {
+            setChatStatus("Connection error");
+          } else if (status === "CLOSED") {
+            setChatStatus("Disconnected");
+          }
+        });
+    } catch (error) {
+      console.error("Connect room:", error);
+      showError("chatError", error.message || "Messages load nahi hue.");
+      setChatStatus("Connection failed");
+    }
+  }
+
+  async function disconnectRealtime() {
+    if (state.channel && state.client) {
+      await state.client.removeChannel(state.channel);
+    }
+
+    state.channel = null;
+  }
+
+  function renderMessage(message) {
+    if (!message || message.id == null) return;
+
+    const id = String(message.id);
+    state.messages.set(id, message);
+
+    if (state.seen.has(id)) {
+      updateMessage(message);
+      return;
+    }
+
+    state.seen.add(id);
+
+    const container = $("chatMessages");
+    if (!container) return;
+
+    container.querySelector(".empty-state")?.remove();
+
+    const decoded = decodeMessageBody(message.body);
+    const own = message.sender_id === state.senderId;
+
+    const article = document.createElement("article");
+    article.className = `message${own ? " own" : ""}`;
+    article.dataset.messageId = id;
+
+    const author = document.createElement("div");
+    author.className = "message-author";
+    author.textContent = own ? "You" : `Guest ${String(message.sender_id).slice(0, 8)}`;
+
+    const content = document.createElement("div");
+    content.className = "message-text";
+    content.textContent = message.deleted_at
+      ? "This message was deleted."
+      : decoded.text;
+
+    const time = document.createElement("div");
+    time.className = "message-time";
+    time.textContent =
+      formatTime(message.created_at) + (message.edited_at ? " · edited" : "");
+
+    const actions = document.createElement("div");
+    actions.className = "message-actions";
+
+    const replyButton = document.createElement("button");
+    replyButton.type = "button";
+    replyButton.textContent = "Reply";
+    replyButton.addEventListener("click", () => setReply(message));
+
+    actions.appendChild(replyButton);
+
+    const copyButton = document.createElement("button");
+    copyButton.type = "button";
+    copyButton.textContent = "Copy";
+    copyButton.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(decoded.text);
+        copyButton.textContent = "Copied";
+      } catch {
+        copyButton.textContent = "Copy failed";
+      }
+    });
+
+    actions.appendChild(copyButton);
+
+    if (own && !message.deleted_at) {
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.textContent = "Edit";
+
+      editButton.addEventListener("click", () => editMessage(message));
+      actions.appendChild(editButton);
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.textContent = "Delete";
+
+      deleteButton.addEventListener("click", () => deleteMessage(message));
+      actions.appendChild(deleteButton);
+    }
+
+    if (!message.deleted_at) {
+      ["❤️", "😂", "👍"].forEach(emoji => {
+        const reactionButton = document.createElement("button");
+        reactionButton.type = "button";
+        reactionButton.textContent = emoji;
+
+        reactionButton.addEventListener("click", () => {
+          toggleReaction(message, emoji);
+        });
+
+        actions.appendChild(reactionButton);
+      });
+    }
+
+    article.append(author, content, time, actions);
+
+    if (decoded.replyTo) {
+      const reply = document.createElement("div");
+      reply.className = "message-time";
+      reply.textContent = `Reply to message #${decoded.replyTo}`;
+      article.insertBefore(reply, content);
+    }
+
+    container.appendChild(article);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function updateMessage(message) {
+    if (!message || message.id == null) return;
+
+    const id = String(message.id);
+    state.messages.set(id, message);
+
+    const existing = document.querySelector(
+      `[data-message-id="${CSS.escape(id)}"]`
+    );
+
+    if (!existing) {
+      renderMessage(message);
+      return;
+    }
+
+    const decoded = decodeMessageBody(message.body);
+    const content = existing.querySelector(".message-text");
+    const time = existing.querySelector(".message-time");
+
+    if (content) {
+      content.textContent = message.deleted_at
+        ? "This message was deleted."
+        : decoded.text;
+    }
+
+    if (time) {
+      time.textContent =
+        formatTime(message.created_at) + (message.edited_at ? " · edited" : "");
+    }
+  }
+
+  function removeMessage(id) {
+    document.querySelector(
+      `[data-message-id="${CSS.escape(String(id))}"]`
+    )?.remove();
+
+    state.messages.delete(String(id));
+    state.seen.delete(String(id));
+  }
+
+  function setReply(message) {
+    state.replyTarget = message.id;
+
+    const decoded = decodeMessageBody(message.body);
+
+    $("replyComposerPreview")?.classList.remove("hidden");
+
+    setText(
+      "replyPreviewText",
+      decoded.text.slice(0, 150) || "Message"
+    );
+
+    $("messageInput")?.focus();
+  }
+
+  function cancelReply() {
+    state.replyTarget = null;
+    $("replyComposerPreview")?.classList.add("hidden");
+    setText("replyPreviewText", "");
+  }
+
+  async function sendMessage(event) {
+    event?.preventDefault();
+
+    const input = $("messageInput");
+    const text = input?.value.trim();
+
+    if (!text || !state.room || !state.client) return;
+
+    if (text.length > CONFIG.MAX_MESSAGE_LENGTH) {
+      showError("chatError", "Message 2000 characters se chhota rakho.");
+      return;
+    }
+
+    const button = $("sendBtn");
+    if (button) button.disabled = true;
+
+    showError("chatError");
+
+    try {
+      const { error } = await state.client
         .from("messages")
         .insert({
           room_id: state.room.id,
           sender_id: state.senderId,
-          body: encodeMessageBody(body, state.replyTarget)
+          body: encodeMessageBody(text, state.replyTarget)
         });
 
       if (error) throw error;
 
       input.value = "";
-      clearReplyTarget();
-
+      cancelReply();
     } catch (error) {
-      showError(
-        "chatError",
-        "Message not sent: " + (error.message || "Check your connection.")
-      );
+      console.error("Send message:", error);
+      showError("chatError", error.message || "Message send nahi hua.");
     } finally {
-      $("sendBtn").disabled = false;
-      input.focus();
+      if (button) button.disabled = false;
+      input?.focus();
     }
-  });
+  }
 
-  // ==========================================
-  // COPY ROOM CODE
-  // ==========================================
+  async function editMessage(message) {
+    if (message.sender_id !== state.senderId) {
+      showError("chatError", "Sirf apna message edit kar sakte ho.");
+      return;
+    }
 
-  $("copyCodeBtn").addEventListener("click", async () => {
-    if (!state.room) return;
+    const decoded = decodeMessageBody(message.body);
+    const replacement = prompt("Message edit karo:", decoded.text);
 
-    await copyText(state.room.code);
+    if (replacement === null) return;
 
-    const button = $("copyCodeBtn");
-    button.textContent = "Copied!";
+    const text = replacement.trim();
 
-    setTimeout(() => {
-      button.textContent = "Copy code";
-    }, 1200);
-  });
+    if (!text || text.length > CONFIG.MAX_MESSAGE_LENGTH) {
+      showError("chatError", "Message empty nahi ho sakta aur 2000 characters se kam hona chahiye.");
+      return;
+    }
 
-  // ==========================================
-  // LIVEKIT CALL UI
-  // ==========================================
+    try {
+      const { error } = await state.client
+        .from("messages")
+        .update({
+          body: encodeMessageBody(text, decoded.replyTo),
+          edited_at: new Date().toISOString()
+        })
+        .eq("id", message.id)
+        .eq("sender_id", state.senderId)
+        .eq("room_id", state.room.id);
 
-  function livekitAvailable() {
-    return Boolean(
-      window.LivekitClient &&
-      window.LivekitClient.Room &&
-      window.LivekitClient.createLocalTracks
+      if (error) throw error;
+    } catch (error) {
+      console.error("Edit message:", error);
+      showError("chatError", error.message || "Message edit nahi hua.");
+    }
+  }
+
+  async function deleteMessage(message) {
+    if (message.sender_id !== state.senderId) {
+      showError("chatError", "Sirf apna message delete kar sakte ho.");
+      return;
+    }
+
+    if (!confirm("Kya tum ye message delete karna chahte ho?")) return;
+
+    try {
+      const { error } = await state.client
+        .from("messages")
+        .update({
+          deleted_at: new Date().toISOString(),
+          body: encodeMessageBody("This message was deleted.")
+        })
+        .eq("id", message.id)
+        .eq("sender_id", state.senderId)
+        .eq("room_id", state.room.id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error("Delete message:", error);
+      showError("chatError", error.message || "Message delete nahi hua.");
+    }
+  }
+
+  async function toggleReaction(message, emoji) {
+    /*
+      Reactions ko JSONB mein store karna concurrent updates ke liye
+      safe nahi hai. Isliye ye handler bina atomic server-side function
+      ke update nahi karta. Isse lost updates aur spoofed identities
+      ka risk avoid hota hai.
+    */
+    showError(
+      "chatError",
+      "Reactions enable karne ke liye secure server-side reaction function configure karna hoga."
     );
   }
 
-  function setCallStatus(text, active = false) {
-    const status = $("callStatus");
+  async function copyRoomCode() {
+    if (!state.roomCode) return;
 
-    status.textContent = text;
-    status.classList.toggle("active", active);
+    try {
+      await navigator.clipboard.writeText(state.roomCode);
+      setText("copyCodeBtn", "Copied!");
+      setTimeout(() => setText("copyCodeBtn", "Copy code"), 1500);
+    } catch {
+      showError("chatError", "Clipboard access nahi mila.");
+    }
   }
 
-  function setCallButtons(connected) {
-    $("joinVoiceBtn").disabled = connected || state.callConnecting;
-    $("joinVideoBtn").disabled = connected || state.callConnecting;
+  async function shareRoom() {
+    if (!state.roomCode) return;
 
-    $("muteBtn").disabled = !connected;
-    $("cameraBtn").disabled = !connected;
-    $("leaveCallBtn").disabled = !connected;
+    const url = new URL(location.href);
+    url.searchParams.set("room", state.roomCode);
+
+    const shareData = {
+      title: "Join my NETBAND room",
+      text: `NETBAND room code: ${state.roomCode}`,
+      url: url.href
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(url.href);
+        showError("chatError", "Room link copy ho gaya.");
+      }
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        showError("chatError", "Room link share nahi ho saka.");
+      }
+    }
   }
 
-  function safeParticipantName() {
-    return "Guest-" + state.senderId.slice(0, 6);
+  function searchMessages(term) {
+    state.searchTerm = String(term || "").toLowerCase();
+
+    document.querySelectorAll("#chatMessages .message").forEach(element => {
+      const text = element.querySelector(".message-text")?.textContent || "";
+      element.classList.toggle(
+        "hidden",
+        !text.toLowerCase().includes(state.searchTerm)
+      );
+    });
   }
 
-  // ==========================================
-  // TOKEN REQUEST
-  // ==========================================
+  async function requestLiveKitToken() {
+    if (!state.client || !state.room) {
+      throw new Error("Pehle room join karo.");
+    }
 
-  async function requestLiveKitToken(roomName, participantName) {
-    const client = backendReady();
-
-    /*
-      NOTE:
-      Supabase Edge Function JWT verification may reject the
-      publishable key as a bearer token.
-
-      Do not disable authorization without adding proper server-side
-      validation and abuse protection.
-    */
-
-    const { data, error } = await client.functions.invoke(
-      "smooth-handler",
+    const { data, error } = await state.client.functions.invoke(
+      CONFIG.TOKEN_FUNCTION,
       {
         body: {
-          roomName,
-          participantName
+          roomName: `netband-${state.room.id}`,
+          participantName: state.senderName
         }
       }
     );
 
-    if (error) {
-      throw new Error(
-        "Could not obtain call token. Check the smooth-handler Edge Function authorization and logs."
-      );
-    }
+    if (error) throw error;
 
-    if (!data || typeof data.token !== "string" || !data.token) {
-      throw new Error(
-        "The token service did not return a valid LiveKit token."
-      );
+    if (!data?.token) {
+      throw new Error("LiveKit token nahi mila. Edge Function check karo.");
     }
 
     return data.token;
   }
 
-  // ==========================================
-  // PARTICIPANT UI
-  // ==========================================
+  async function joinCall(withVideo = false) {
+    if (state.callConnecting || state.call) return;
 
-  function participantDisplayName(participant) {
-    return (
-      participant.name ||
-      participant.identity ||
-      "Guest"
-    );
-  }
-
-  function getParticipants() {
-    const participants = [];
-
-    if (state.callRoom?.localParticipant) {
-      participants.push(state.callRoom.localParticipant);
-    }
-
-    if (state.callRoom?.remoteParticipants) {
-      state.callRoom.remoteParticipants.forEach((participant) => {
-        participants.push(participant);
-      });
-    }
-
-    return participants;
-  }
-
-  function renderParticipants() {
-    const container = $("participantList");
-    const participants = getParticipants();
-
-    $("participantCount").textContent = String(participants.length);
-
-    container.replaceChildren();
-
-    if (!participants.length) {
-      const empty = document.createElement("p");
-      empty.className = "muted small";
-      empty.textContent = "No participants yet.";
-      container.appendChild(empty);
+    if (!livekitLibrary?.Room || !livekitLibrary?.createLocalTracks) {
+      showError("callError", "LiveKit client load nahi hua. Page refresh karo.");
       return;
     }
 
-    participants.forEach((participant) => {
+    state.callConnecting = true;
+    showError("callError");
+
+    setText("callStatus", "Connecting...");
+
+    try {
+      const token = await requestLiveKitToken();
+
+      const call = new livekitLibrary.Room({
+        adaptiveStream: true,
+        dynacast: true
+      });
+
+      state.call = call;
+
+      registerCallEvents(call);
+
+      await call.connect(CONFIG.LIVEKIT_URL, token);
+
+      const tracks = await livekitLibrary.createLocalTracks({
+        audio: true,
+        video: withVideo
+      });
+
+      state.localTracks = tracks;
+
+      for (const track of tracks) {
+        await call.localParticipant.publishTrack(track);
+      }
+
+      $("joinVoiceBtn").disabled = true;
+      $("joinVideoBtn").disabled = true;
+      $("muteBtn").disabled = false;
+      $("cameraBtn").disabled = false;
+      $("leaveCallBtn").disabled = false;
+
+      setText("callStatus", "Call connected");
+      $("callStatus")?.classList.add("active");
+
+      updateParticipants();
+      updateVideoGrid();
+    } catch (error) {
+      console.error("Join call:", error);
+
+      if (state.call) {
+        try {
+          await state.call.disconnect();
+        } catch {}
+      }
+
+      state.call = null;
+
+      state.localTracks.forEach(track => track.stop());
+      state.localTracks = [];
+
+      showError(
+        "callError",
+        error.message || "Call connect nahi hui. Token function aur permissions check karo."
+      );
+
+      setText("callStatus", "Not in a call");
+    } finally {
+      state.callConnecting = false;
+    }
+  }
+
+  function registerCallEvents(call) {
+    call
+      .on(livekitLibrary.RoomEvent.ParticipantConnected, () => {
+        updateParticipants();
+        updateVideoGrid();
+      })
+      .on(livekitLibrary.RoomEvent.ParticipantDisconnected, () => {
+        updateParticipants();
+        updateVideoGrid();
+      })
+      .on(livekitLibrary.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        attachTrack(track, participant);
+      })
+      .on(livekitLibrary.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+        detachTrack(track, participant);
+      })
+      .on(livekitLibrary.RoomEvent.TrackMuted, () => {
+        updateParticipants();
+      })
+      .on(livekitLibrary.RoomEvent.TrackUnmuted, () => {
+        updateParticipants();
+      })
+      .on(livekitLibrary.RoomEvent.Disconnected, () => {
+        setText("callStatus", "Call disconnected");
+      });
+  }
+
+  function attachTrack(track, participant) {
+    if (track.kind !== "video" && track.kind !== "audio") return;
+
+    const grid = $("videoGrid");
+    if (!grid) return;
+
+    $("videoEmpty")?.remove();
+
+    const key = participant.identity;
+
+    let tile = grid.querySelector(
+      `[data-participant="${CSS.escape(key)}"]`
+    );
+
+    if (!tile) {
+      tile = document.createElement("div");
+      tile.className = "video-tile";
+      tile.dataset.participant = key;
+
+      const name = document.createElement("div");
+      name.className = "video-name";
+      name.textContent = participant.name || participant.identity;
+
+      tile.appendChild(name);
+      grid.appendChild(tile);
+    }
+
+    const mediaElement = track.attach();
+
+    if (mediaElement instanceof HTMLVideoElement) {
+      mediaElement.autoplay = true;
+      mediaElement.playsInline = true;
+    }
+
+    tile.insertBefore(mediaElement, tile.firstChild);
+  }
+
+  function detachTrack(track, participant) {
+    track.detach().forEach(element => element.remove());
+
+    const tile = $("videoGrid")?.querySelector(
+      `[data-participant="${CSS.escape(participant.identity)}"]`
+    );
+
+    if (tile && !tile.querySelector("video")) {
+      tile.remove();
+    }
+
+    updateVideoGrid();
+  }
+
+  function updateVideoGrid() {
+    if (!state.call) return;
+
+    const grid = $("videoGrid");
+    if (!grid) return;
+
+    const local = state.call.localParticipant;
+
+    if (local) {
+      const key = local.identity;
+      let tile = grid.querySelector(
+        `[data-participant="${CSS.escape(key)}"]`
+      );
+
+      if (!tile) {
+        tile = document.createElement("div");
+        tile.className = "video-tile";
+        tile.dataset.participant = key;
+
+        const name = document.createElement("div");
+        name.className = "video-name";
+        name.textContent = `${state.senderName} (You)`;
+
+        tile.appendChild(name);
+        grid.appendChild(tile);
+      }
+
+      local.videoTrackPublications.forEach(publication => {
+        const track = publication.videoTrack;
+
+        if (track && !tile.querySelector("video")) {
+          const element = track.attach();
+          element.autoplay = true;
+          element.playsInline = true;
+          element.dataset.local = "true";
+          tile.insertBefore(element, tile.firstChild);
+        }
+      });
+    }
+  }
+
+  function updateParticipants() {
+    const call = state.call;
+    const list = $("participantList");
+
+    if (!list) return;
+
+    list.replaceChildren();
+
+    if (!call) {
+      list.textContent = "No participants yet.";
+      setText("participantCount", "0");
+      return;
+    }
+
+    const participants = [
+      call.localParticipant,
+      ...call.remoteParticipants.values()
+    ];
+
+    setText("participantCount", String(participants.length));
+
+    participants.forEach(participant => {
       const row = document.createElement("div");
       row.className = "participant";
 
       const avatar = document.createElement("div");
       avatar.className = "participant-avatar";
-
-      avatar.textContent =
-        participantDisplayName(participant).charAt(0).toUpperCase();
+      avatar.textContent = (participant.name || participant.identity || "G")
+        .slice(0, 1)
+        .toUpperCase();
 
       const details = document.createElement("div");
       details.className = "participant-details";
 
       const name = document.createElement("strong");
-      name.textContent = participantDisplayName(participant);
+      name.textContent = participant.name || participant.identity;
 
-      const mic = participant.isMicrophoneEnabled
-        ? "Mic on"
-        : "Mic off";
+      const status = document.createElement("small");
 
-      const camera = participant.isCameraEnabled
-        ? "Camera on"
-        : "Camera off";
+      const mic = participant.isMicrophoneEnabled ? "Mic on" : "Mic off";
+      const camera = participant.isCameraEnabled ? "Camera on" : "Camera off";
 
-      const info = document.createElement("small");
-      info.textContent = `${mic} · ${camera}`;
+      status.textContent =
+        `${participant === call.localParticipant ? "You · " : ""}${mic} · ${camera}`;
 
-      details.append(name, info);
+      details.append(name, status);
       row.append(avatar, details);
-      container.appendChild(row);
+      list.appendChild(row);
     });
   }
 
-  // ==========================================
-  // VIDEO ELEMENTS
-  // ==========================================
-
-  function getTileId(participant) {
-    const raw =
-      participant.identity ||
-      participant.sid ||
-      "participant";
-
-    return "video-" + raw.replace(/[^a-zA-Z0-9_-]/g, "_");
-  }
-
-  function getOrCreateTile(participant) {
-    const grid = $("videoGrid");
-    const tileId = getTileId(participant);
-
-    let tile = document.getElementById(tileId);
-
-    if (tile) return tile;
-
-    $("videoEmpty")?.remove();
-
-    tile = document.createElement("div");
-    tile.className = "video-tile";
-    tile.id = tileId;
-
-    const placeholder = document.createElement("div");
-    placeholder.className = "video-placeholder";
-    placeholder.textContent = "◉";
-    placeholder.dataset.placeholder = "true";
-
-    const name = document.createElement("div");
-    name.className = "video-name";
-    name.textContent = participantDisplayName(participant);
-
-    tile.append(placeholder, name);
-    grid.appendChild(tile);
-
-    return tile;
-  }
-
-  function removeTile(participant) {
-    const tile = document.getElementById(getTileId(participant));
-
-    if (tile) tile.remove();
-
-    if (!$("videoGrid").querySelector(".video-tile")) {
-      const empty = document.createElement("div");
-      empty.id = "videoEmpty";
-      empty.className = "video-empty";
-
-      const icon = document.createElement("span");
-      icon.textContent = "◉";
-
-      const title = document.createElement("strong");
-      title.textContent = "No active call";
-
-      const description = document.createElement("small");
-      description.textContent =
-        "Join voice or video to connect with room members.";
-
-      empty.append(icon, title, description);
-      $("videoGrid").appendChild(empty);
-    }
-  }
-
-  function attachTrack(track, participant) {
-    if (!track || !participant) return;
-
-    const tile = getOrCreateTile(participant);
-
-    if (track.kind === "video") {
-      const placeholder = tile.querySelector(
-        '[data-placeholder="true"]'
-      );
-
-      if (placeholder) placeholder.remove();
-
-      let video = tile.querySelector("video");
-
-      if (!video) {
-        video = document.createElement("video");
-
-        video.autoplay = true;
-        video.playsInline = true;
-        video.muted = participant === state.callRoom?.localParticipant;
-
-        if (participant === state.callRoom?.localParticipant) {
-          video.dataset.local = "true";
-        }
-
-        tile.prepend(video);
-      }
-
-      track.attach(video);
-
-      video.play().catch(() => {
-        // Some browsers require a user interaction before playback.
-      });
-
-    } else if (track.kind === "audio") {
-      const audio = document.createElement("audio");
-
-      audio.autoplay = true;
-      audio.playsInline = true;
-
-      tile.appendChild(audio);
-      track.attach(audio);
-
-      audio.play().catch(() => {
-        // Browser autoplay restrictions may require interaction.
-      });
-    }
-
-    renderParticipants();
-  }
-
-  function detachTrack(track) {
-    if (!track) return;
+  async function toggleMicrophone() {
+    const call = state.call;
+    if (!call) return;
 
     try {
-      const elements = track.detach();
+      const enabled = call.localParticipant.isMicrophoneEnabled;
+      await call.localParticipant.setMicrophoneEnabled(!enabled);
 
-      elements.forEach((element) => {
-        element.remove();
-      });
+      setText("muteBtn", enabled ? "Unmute mic" : "Mute mic");
+      updateParticipants();
     } catch (error) {
-      console.warn("Track detach failed.");
+      showError("callError", error.message || "Microphone toggle fail hua.");
     }
   }
 
-  function handleTrackSubscribed(track, publication, participant) {
-    attachTrack(track, participant);
-    renderParticipants();
-  }
-
-  function handleTrackUnsubscribed(track, publication, participant) {
-    detachTrack(track);
-
-    if (track.kind === "video" && participant) {
-      const tile = getOrCreateTile(participant);
-
-      if (!tile.querySelector("video")) {
-        let placeholder = tile.querySelector(
-          '[data-placeholder="true"]'
-        );
-
-        if (!placeholder) {
-          placeholder = document.createElement("div");
-          placeholder.className = "video-placeholder";
-          placeholder.dataset.placeholder = "true";
-          placeholder.textContent = "◉";
-
-          tile.prepend(placeholder);
-        }
-      }
-    }
-
-    renderParticipants();
-  }
-
-  // ==========================================
-  // CONNECT TO LIVEKIT
-  // ==========================================
-
-  async function joinCall(mode) {
-    if (state.callConnecting || state.callRoom) return;
-
-    showError("callError", "");
-
-    if (!state.room) {
-      showError("callError", "Create or join a chat room first.");
-      return;
-    }
-
-    if (Date.now() >= state.expiresAt) {
-      showError("callError", "This room has expired.");
-      return;
-    }
-
-    if (!navigator.onLine) {
-      showError("callError", "Internet connection is required for calls.");
-      return;
-    }
-
-    if (!livekitAvailable()) {
-      showError(
-        "callError",
-        "LiveKit SDK did not load. Refresh the page and try again."
-      );
-      return;
-    }
-
-    state.callConnecting = true;
-    state.callMode = mode;
-
-    setCallButtons(false);
-
-    $("joinVoiceBtn").disabled = true;
-    $("joinVideoBtn").disabled = true;
-
-    setCallStatus("Connecting…");
-
-    let room;
+  async function toggleCamera() {
+    const call = state.call;
+    if (!call) return;
 
     try {
-      const participantName = safeParticipantName();
-      const roomName = "netband-" + state.room.code;
+      const enabled = call.localParticipant.isCameraEnabled;
+      await call.localParticipant.setCameraEnabled(!enabled);
 
-      const token = await requestLiveKitToken(
-        roomName,
-        participantName
-      );
+      setText("cameraBtn", enabled ? "Turn camera on" : "Turn camera off");
 
-      room = new window.LivekitClient.Room({
-        adaptiveStream: true,
-        dynacast: true
-      });
-
-      room.on(
-        window.LivekitClient.RoomEvent.TrackSubscribed,
-        handleTrackSubscribed
-      );
-
-      room.on(
-        window.LivekitClient.RoomEvent.TrackUnsubscribed,
-        handleTrackUnsubscribed
-      );
-
-      room.on(
-        window.LivekitClient.RoomEvent.ParticipantConnected,
-        () => renderParticipants()
-      );
-
-      room.on(
-        window.LivekitClient.RoomEvent.ParticipantDisconnected,
-        (participant) => {
-          removeTile(participant);
-          renderParticipants();
-        }
-      );
-
-      room.on(
-        window.LivekitClient.RoomEvent.LocalTrackPublished,
-        (publication, participant) => {
-          if (publication.track) {
-            attachTrack(publication.track, participant);
-          }
-
-          renderParticipants();
-        }
-      );
-
-      room.on(
-        window.LivekitClient.RoomEvent.LocalTrackUnpublished,
-        (publication, participant) => {
-          if (publication.track) {
-            detachTrack(publication.track);
-          }
-
-          renderParticipants();
-        }
-      );
-
-      room.on(
-        window.LivekitClient.RoomEvent.Disconnected,
-        () => {
-          if (state.callRoom === room) {
-            state.callRoom = null;
-            state.micEnabled = false;
-            state.cameraEnabled = false;
-
-            setCallButtons(false);
-            setCallStatus("Disconnected");
-
-            renderParticipants();
-          }
-        }
-      );
-
-      await room.connect(config.livekitUrl, token);
-
-      state.callRoom = room;
-
-      // Start microphone and optionally camera.
-      await room.localParticipant.setMicrophoneEnabled(true);
-      state.micEnabled = true;
-
-      if (mode === "video") {
-        await room.localParticipant.setCameraEnabled(true);
-        state.cameraEnabled = true;
-      }
-
-      // Render existing participants already in the room.
-      room.remoteParticipants.forEach((participant) => {
-        participant.trackPublications.forEach((publication) => {
-          if (publication.track && publication.isSubscribed) {
-            attachTrack(publication.track, participant);
-          }
-        });
-      });
-
-      // Attach locally published tracks.
-      room.localParticipant.trackPublications.forEach((publication) => {
-        if (publication.track) {
-          attachTrack(publication.track, room.localParticipant);
-        }
-      });
-
-      setCallStatus(
-        mode === "video" ? "Video call active" : "Voice call active",
-        true
-      );
-
-      $("muteBtn").textContent = "Mute mic";
-      $("cameraBtn").textContent = state.cameraEnabled
-        ? "Turn camera off"
-        : "Turn camera on";
-
-      setCallButtons(true);
-      renderParticipants();
-
+      updateParticipants();
+      updateVideoGrid();
     } catch (error) {
-      console.error("LiveKit connection failed:", error);
-
-      if (room) {
-        try {
-          await room.disconnect();
-        } catch {
-          // Ignore cleanup errors.
-        }
-      }
-
-      if (state.callRoom === room) {
-        state.callRoom = null;
-      }
-
-      setCallStatus("Call unavailable");
-
-      let message =
-        error?.message ||
-        "Could not connect to the call.";
-
-      if (
-        /token|unauthorized|401|403|authorization/i.test(message)
-      ) {
-        message =
-          "Call token authorization failed. Check the smooth-handler Edge Function and its logs.";
-      } else if (
-        /permission|device|microphone|camera|notallowed/i.test(message)
-      ) {
-        message =
-          "Microphone or camera access failed. Allow permissions in your browser and retry.";
-      }
-
-      showError("callError", message);
-
-    } finally {
-      state.callConnecting = false;
-
-      if (!state.callRoom) {
-        $("joinVoiceBtn").disabled = false;
-        $("joinVideoBtn").disabled = false;
-        $("muteBtn").disabled = true;
-        $("cameraBtn").disabled = true;
-        $("leaveCallBtn").disabled = true;
-      }
+      showError("callError", error.message || "Camera toggle fail hua.");
     }
   }
-
-  // ==========================================
-  // CALL BUTTONS
-  // ==========================================
-
-  $("joinVoiceBtn").addEventListener("click", () => {
-    joinCall("voice");
-  });
-
-  $("joinVideoBtn").addEventListener("click", () => {
-    joinCall("video");
-  });
-
-  // ==========================================
-  // MICROPHONE TOGGLE
-  // ==========================================
-
-  $("muteBtn").addEventListener("click", async () => {
-    const room = state.callRoom;
-
-    if (!room) return;
-
-    try {
-      const enable = !state.micEnabled;
-
-      await room.localParticipant.setMicrophoneEnabled(enable);
-
-      state.micEnabled = enable;
-
-      $("muteBtn").textContent = enable ? "Mute mic" : "Unmute mic";
-
-      renderParticipants();
-
-    } catch (error) {
-      showError(
-        "callError",
-        "Could not change microphone state. Check microphone permissions."
-      );
-    }
-  });
-
-  // ==========================================
-  // CAMERA TOGGLE
-  // ==========================================
-
-  $("cameraBtn").addEventListener("click", async () => {
-    const room = state.callRoom;
-
-    if (!room) return;
-
-    try {
-      const enable = !state.cameraEnabled;
-
-      await room.localParticipant.setCameraEnabled(enable);
-
-      state.cameraEnabled = enable;
-
-      $("cameraBtn").textContent =
-        enable ? "Turn camera off" : "Turn camera on";
-
-      renderParticipants();
-
-    } catch (error) {
-      showError(
-        "callError",
-        "Could not change camera state. Check camera permissions."
-      );
-    }
-  });
-
-  // ==========================================
-  // LEAVE CALL
-  // ==========================================
 
   async function leaveCall() {
-    const room = state.callRoom;
+    const call = state.call;
 
-    state.callRoom = null;
-    state.callMode = null;
-    state.micEnabled = false;
-    state.cameraEnabled = false;
+    state.call = null;
 
-    if (room) {
+    if (call) {
       try {
-        await room.disconnect();
+        await call.disconnect();
       } catch (error) {
-        console.warn("Call disconnect cleanup failed.");
-      }
-
-      try {
-        room.localParticipant.trackPublications.forEach((publication) => {
-          if (publication.track) {
-            detachTrack(publication.track);
-          }
-        });
-
-        room.remoteParticipants.forEach((participant) => {
-          participant.trackPublications.forEach((publication) => {
-            if (publication.track) {
-              detachTrack(publication.track);
-            }
-          });
-        });
-      } catch {
-        // Ignore tracks already removed during disconnect.
+        console.warn("Call disconnect:", error);
       }
     }
 
-    $("videoGrid").replaceChildren();
+    state.localTracks.forEach(track => {
+      try {
+        track.stop();
+      } catch {}
+    });
 
-    const empty = document.createElement("div");
-    empty.id = "videoEmpty";
-    empty.className = "video-empty";
-
-    const icon = document.createElement("span");
-    icon.textContent = "◉";
-
-    const title = document.createElement("strong");
-    title.textContent = "No active call";
-
-    const description = document.createElement("small");
-    description.textContent =
-      "Join voice or video to connect with room members.";
-
-    empty.append(icon, title, description);
-    $("videoGrid").appendChild(empty);
-
-    $("participantList").replaceChildren();
-
-    const emptyParticipants = document.createElement("p");
-    emptyParticipants.className = "muted small";
-    emptyParticipants.textContent = "No participants yet.";
-
-    $("participantList").appendChild(emptyParticipants);
-    $("participantCount").textContent = "0";
-
-    setCallStatus("Not in a call");
-    setCallButtons(false);
+    state.localTracks = [];
 
     $("joinVoiceBtn").disabled = false;
     $("joinVideoBtn").disabled = false;
+    $("muteBtn").disabled = true;
+    $("cameraBtn").disabled = true;
+    $("leaveCallBtn").disabled = true;
 
-    showError("callError", "");
+    setText("muteBtn", "Mute mic");
+    setText("cameraBtn", "Turn camera on");
+    setText("callStatus", "Not in a call");
+
+    $("callStatus")?.classList.remove("active");
+
+    $("videoGrid")?.replaceChildren();
+
+    if ($("videoGrid")) {
+      const empty = document.createElement("div");
+      empty.id = "videoEmpty";
+      empty.className = "video-empty";
+      empty.innerHTML =
+        "<span>◉</span><strong>No active call</strong><small>Join voice or video to connect with room members.</small>";
+
+      $("videoGrid").appendChild(empty);
+    }
+
+    updateParticipants();
   }
 
-  $("leaveCallBtn").addEventListener("click", leaveCall);
-
-  // ==========================================
-  // LEAVE CHAT ROOM
-  // ==========================================
-
-  async function leaveRoom(expired = false) {
+  async function leaveRoom() {
     clearInterval(state.timer);
     state.timer = null;
 
-    // Leave voice/video call first.
     await leaveCall();
+    await disconnectRealtime();
 
-    if (state.channel && state.client) {
-      try {
-        await state.client.removeChannel(state.channel);
-      } catch {
-        console.warn("Could not close realtime channel.");
-      }
-    }
-
-    state.channel = null;
     state.room = null;
+    state.roomCode = null;
     state.expiresAt = null;
+    state.replyTarget = null;
 
-    clearReplyTarget();
-
-    $("chatPanel").classList.add("hidden");
-    $("setupPanel").classList.remove("hidden");
-    $("roomInput").value = "";
-
-    $("chatMessages").replaceChildren();
     state.seen.clear();
-    showEmptyState();
+    state.messages.clear();
 
-    if (expired) {
-      showError(
-        "setupError",
-        "Room expired. Create a new room to chat."
-      );
+    $("chatPanel")?.classList.add("hidden");
+    $("setupPanel")?.classList.remove("hidden");
+    $("replyComposerPreview")?.classList.add("hidden");
+
+    if ($("chatMessages")) {
+      $("chatMessages").replaceChildren();
+
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.innerHTML =
+        "<span>✧</span><strong>Your conversation starts here</strong><p>Share the room code with the person you want to chat with.</p>";
+
+      $("chatMessages").appendChild(empty);
     }
+
+    const url = new URL(location.href);
+    url.searchParams.delete("room");
+    history.replaceState({}, "", url);
+
+    showError("chatError");
+    showError("callError");
   }
 
-  $("leaveBtn").addEventListener("click", () => {
-    leaveRoom(false);
-  });
+  function setupEventListeners() {
+    $("createBtn")?.addEventListener("click", createRoom);
 
-  // ==========================================
-  // PAGE CLOSE CLEANUP
-  // ==========================================
+    $("joinForm")?.addEventListener("submit", event => {
+      event.preventDefault();
+      joinRoom($("roomInput")?.value);
+    });
 
-  window.addEventListener("pagehide", () => {
-    try {
-      state.callRoom?.disconnect();
-    } catch {
-      // Browser is closing.
-    }
-  });
+    $("roomInput")?.addEventListener("input", event => {
+      event.target.value = event.target.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, "");
+    });
 
-  // ==========================================
-  // SERVICE WORKER
-  // ==========================================
+    $("messageForm")?.addEventListener("submit", sendMessage);
 
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker
-        .register("./sw.js")
-        .catch(() => {
-          console.warn("Service worker registration failed.");
-        });
+    $("cancelReplyBtn")?.addEventListener("click", cancelReply);
+
+    $("copyCodeBtn")?.addEventListener("click", copyRoomCode);
+
+    $("leaveBtn")?.addEventListener("click", async () => {
+      if (confirm("Room chhodna hai?")) await leaveRoom();
+    });
+
+    $("joinVoiceBtn")?.addEventListener("click", () => joinCall(false));
+    $("joinVideoBtn")?.addEventListener("click", () => joinCall(true));
+
+    $("muteBtn")?.addEventListener("click", toggleMicrophone);
+    $("cameraBtn")?.addEventListener("click", toggleCamera);
+    $("leaveCallBtn")?.addEventListener("click", leaveCall);
+
+    window.addEventListener("online", setNetworkStatus);
+    window.addEventListener("offline", setNetworkStatus);
+
+    window.addEventListener("pagehide", () => {
+      clearInterval(state.timer);
+
+      if (state.call) {
+        state.call.disconnect();
+      }
     });
   }
+
+  async function start() {
+    setNetworkStatus();
+    setupEventListeners();
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./sw.js").catch(error => {
+        console.warn("Service worker registration failed:", error);
+      });
+    }
+
+    const params = new URLSearchParams(location.search);
+    const roomCode = params.get("room");
+
+    if (roomCode) {
+      $("roomInput").value = roomCode.toUpperCase();
+      await joinRoom(roomCode);
+    }
+  }
+
+  start();
 })();

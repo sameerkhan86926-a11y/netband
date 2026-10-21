@@ -31,8 +31,34 @@
     callConnecting: false,
     busy: false,
     searchTerm: "",
-    localTracks: []
+    localTracks: [],
+    soundEnabled: true,
+    isScreenSharing: false,
+    typingTimer: null
   };
+
+  /* Web Audio Synthesizer: Native Notification Sound */
+  function playNotificationSound() {
+    if (!state.soundEnabled) return;
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1); // A5
+
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.25);
+    } catch {}
+  }
 
   function getSenderId() {
     const key = "netband_sender_id";
@@ -54,23 +80,16 @@
   }
 
   function initializeBackend() {
-    if (!supabaseLibrary?.createClient) {
-      throw new Error("Supabase SDK load nahi hua. Page refresh karein.");
-    }
-
+    if (!supabaseLibrary?.createClient) throw new Error("Supabase SDK load nahi hua.");
     if (!state.client) {
-      state.client = supabaseLibrary.createClient(
-        CONFIG.SUPABASE_URL,
-        CONFIG.SUPABASE_KEY
-      );
+      state.client = supabaseLibrary.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
     }
-
     return state.client;
   }
 
   function setText(id, text) {
-    const element = $(id);
-    if (element) element.textContent = text;
+    const el = $(id);
+    if (el) el.textContent = text;
   }
 
   function showError(id, message = "") {
@@ -82,8 +101,8 @@
     if ($("createBtn")) $("createBtn").disabled = value;
     if ($("roomInput")) $("roomInput").disabled = value;
     if ($("joinForm")) {
-      const button = $("joinForm").querySelector('button[type="submit"]');
-      if (button) button.disabled = value;
+      const btn = $("joinForm").querySelector('button[type="submit"]');
+      if (btn) btn.disabled = value;
     }
   }
 
@@ -91,35 +110,26 @@
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     const bytes = new Uint8Array(8);
     crypto.getRandomValues(bytes);
-    return Array.from(bytes, byte => chars[byte % chars.length]).join("");
+    return Array.from(bytes, b => chars[b % chars.length]).join("");
   }
 
-  function formatTime(value) {
-    return new Date(value).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit"
-    });
+  function formatTime(val) {
+    return new Date(val).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 
   function formatDuration(ms) {
-    const seconds = Math.max(0, Math.ceil(ms / 1000));
-    const minutes = Math.floor(seconds / 60);
-    const remaining = seconds % 60;
-    return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
+    const sec = Math.max(0, Math.ceil(ms / 1000));
+    const min = Math.floor(sec / 60);
+    const rem = sec % 60;
+    return `${String(min).padStart(2, "0")}:${String(rem).padStart(2, "0")}`;
   }
 
   function decodeMessageBody(body) {
     const prefix = "__NETBAND_V2__:";
-    if (typeof body !== "string" || !body.startsWith(prefix)) {
-      return { text: body || "", replyTo: null };
-    }
-
+    if (typeof body !== "string" || !body.startsWith(prefix)) return { text: body || "", replyTo: null };
     try {
       const data = JSON.parse(body.slice(prefix.length));
-      return {
-        text: typeof data.text === "string" ? data.text : "",
-        replyTo: data.replyTo || null
-      };
+      return { text: data.text || "", replyTo: data.replyTo || null };
     } catch {
       return { text: body, replyTo: null };
     }
@@ -132,18 +142,11 @@
   function setNetworkStatus() {
     const online = navigator.onLine;
     setText("networkLabel", online ? "Internet connected" : "You're offline");
-
     const dot = $("onlineDot");
     if (dot) {
       dot.style.background = online ? "var(--success)" : "var(--danger)";
-      dot.style.boxShadow = online
-        ? "0 0 10px rgba(54, 229, 162, 0.7)"
-        : "0 0 10px rgba(255, 85, 119, 0.7)";
+      dot.style.boxShadow = online ? "0 0 10px rgba(54, 229, 162, 0.7)" : "0 0 10px rgba(255, 85, 119, 0.7)";
     }
-  }
-
-  function setChatStatus(text) {
-    setText("chatStatus", text);
   }
 
   function showChat(room) {
@@ -166,10 +169,8 @@
 
   function startExpiryTimer() {
     clearInterval(state.timer);
-
     function update() {
       const remaining = state.expiresAt - Date.now();
-
       if (remaining <= 0) {
         clearInterval(state.timer);
         setText("expiryTitle", "Room time has ended");
@@ -178,14 +179,11 @@
         showError("setupError", "Room expire ho gaya. Naya room banayein.");
         return;
       }
-
       setText("expiryTitle", `Room expires in ${formatDuration(remaining)}`);
-
       if ($("expiryBar")) {
         $("expiryBar").style.width = `${Math.min(100, (remaining / CONFIG.ROOM_DURATION) * 100)}%`;
       }
     }
-
     update();
     state.timer = setInterval(update, 1000);
   }
@@ -203,29 +201,18 @@
         const code = generateRoomCode();
         const { data, error } = await client
           .from("rooms")
-          .insert({
-            code,
-            expires_at: new Date(Date.now() + CONFIG.ROOM_DURATION).toISOString()
-          })
+          .insert({ code, expires_at: new Date(Date.now() + CONFIG.ROOM_DURATION).toISOString() })
           .select("id,code,created_at,expires_at")
           .single();
 
-        if (!error) {
-          createdRoom = data;
-          break;
-        }
-
-        if (!String(error.message || "").toLowerCase().includes("duplicate")) {
-          throw error;
-        }
+        if (!error) { createdRoom = data; break; }
+        if (!String(error.message || "").toLowerCase().includes("duplicate")) throw error;
       }
 
-      if (!createdRoom) throw new Error("Room create nahi hua. Dobara try karein.");
-
+      if (!createdRoom) throw new Error("Room create nahi hua.");
       await connectToRoom(createdRoom);
-    } catch (error) {
-      console.error("Create room:", error);
-      showError("setupError", error.message || "Room create nahi ho saka.");
+    } catch (err) {
+      showError("setupError", err.message || "Room create fail hua.");
     } finally {
       setBusy(false);
     }
@@ -234,9 +221,8 @@
   async function joinRoom(code) {
     if (state.busy) return;
     const roomCode = String(code || "").trim().toUpperCase();
-
     if (!/^[A-HJ-NP-Z2-9]{8}$/.test(roomCode)) {
-      showError("setupError", "8-characters ka valid code daalein.");
+      showError("setupError", "8-character room code daalein.");
       return;
     }
 
@@ -253,12 +239,10 @@
         .maybeSingle();
 
       if (error) throw error;
-      if (!data) throw new Error("Room nahi mila ya expire ho gaya.");
-
+      if (!data) throw new Error("Room nahi mila ya expire ho chuka hai.");
       await connectToRoom(data);
-    } catch (error) {
-      console.error("Join room:", error);
-      showError("setupError", error.message || "Room join nahi hua.");
+    } catch (err) {
+      showError("setupError", err.message || "Join failed.");
     } finally {
       setBusy(false);
     }
@@ -266,14 +250,13 @@
 
   async function connectToRoom(room) {
     await disconnectRealtime();
-
     state.room = room;
     state.roomCode = room.code;
     state.seen.clear();
     state.messages.clear();
 
     showChat(room);
-    setChatStatus("Connecting...");
+    setText("chatStatus", "Connecting...");
 
     try {
       const client = initializeBackend();
@@ -285,70 +268,76 @@
         .limit(300);
 
       if (error) throw error;
-
-      (data || []).forEach(renderMessage);
+      (data || []).forEach(m => renderMessage(m, false));
 
       state.channel = client
         .channel(`netband-room-${room.id}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "messages",
-            filter: `room_id=eq.${room.id}`
-          },
-          payload => {
-            if (payload.eventType === "INSERT") renderMessage(payload.new);
-            else if (payload.eventType === "UPDATE") updateMessage(payload.new);
-            else if (payload.eventType === "DELETE") removeMessage(payload.old.id);
+        .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `room_id=eq.${room.id}` }, payload => {
+          if (payload.eventType === "INSERT") renderMessage(payload.new, true);
+          else if (payload.eventType === "UPDATE") updateMessage(payload.new);
+          else if (payload.eventType === "DELETE") removeMessage(payload.old.id);
+        })
+        .on("broadcast", { event: "typing" }, payload => {
+          if (payload.payload?.senderId !== state.senderId) {
+            handleTypingIndicator(payload.payload?.senderName);
           }
-        )
+        })
         .subscribe(status => {
-          if (status === "SUBSCRIBED") setChatStatus("Connected · Realtime");
-          else if (status === "CHANNEL_ERROR") setChatStatus("Connection error");
-          else if (status === "CLOSED") setChatStatus("Disconnected");
+          if (status === "SUBSCRIBED") setText("chatStatus", "Connected · Realtime");
         });
-    } catch (error) {
-      console.error("Connect room:", error);
-      showError("chatError", error.message || "Messages load nahi hue.");
-      setChatStatus("Connection failed");
+    } catch (err) {
+      showError("chatError", err.message || "Load failed.");
+      setText("chatStatus", "Connection failed");
     }
   }
 
   async function disconnectRealtime() {
-    if (state.channel && state.client) {
-      await state.client.removeChannel(state.channel);
-    }
+    if (state.channel && state.client) await state.client.removeChannel(state.channel);
     state.channel = null;
   }
 
-  function renderMessage(message) {
-    if (!message || message.id == null) return;
+  function handleTypingIndicator(name) {
+    const indicator = $("typingIndicator");
+    if (!indicator) return;
+    setText("typingText", `${name || "Someone"} is typing...`);
+    indicator.classList.remove("hidden");
 
+    clearTimeout(state.typingTimer);
+    state.typingTimer = setTimeout(() => {
+      indicator.classList.add("hidden");
+    }, 2000);
+  }
+
+  function emitTyping() {
+    if (!state.channel || !state.room) return;
+    state.channel.send({
+      type: "broadcast",
+      event: "typing",
+      payload: { senderId: state.senderId, senderName: state.senderName }
+    });
+  }
+
+  function renderMessage(message, isNew = false) {
+    if (!message || message.id == null) return;
     const id = String(message.id);
     state.messages.set(id, message);
 
-    if (state.seen.has(id)) {
-      updateMessage(message);
-      return;
-    }
-
+    if (state.seen.has(id)) { updateMessage(message); return; }
     state.seen.add(id);
 
     const container = $("chatMessages");
     if (!container) return;
-
     container.querySelector(".empty-state")?.remove();
 
     const decoded = decodeMessageBody(message.body);
     const own = message.sender_id === state.senderId;
 
+    if (isNew && !own) playNotificationSound();
+
     const article = document.createElement("article");
     article.className = `message${own ? " own" : ""}`;
     article.dataset.messageId = id;
 
-    // Fixed: Matches .message-sender in CSS
     const sender = document.createElement("span");
     sender.className = "message-sender";
     sender.textContent = own ? "You" : `Guest-${String(message.sender_id).slice(0, 5)}`;
@@ -381,13 +370,9 @@
     copyButton.type = "button";
     copyButton.textContent = "Copy";
     copyButton.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(decoded.text);
-        copyButton.textContent = "Copied";
-        setTimeout(() => (copyButton.textContent = "Copy"), 1500);
-      } catch {
-        copyButton.textContent = "Failed";
-      }
+      await navigator.clipboard.writeText(decoded.text);
+      copyButton.textContent = "Copied";
+      setTimeout(() => (copyButton.textContent = "Copy"), 1500);
     });
     actions.appendChild(copyButton);
 
@@ -412,27 +397,16 @@
 
   function updateMessage(message) {
     if (!message || message.id == null) return;
-
     const id = String(message.id);
     state.messages.set(id, message);
-
     const existing = document.querySelector(`[data-message-id="${CSS.escape(id)}"]`);
-    if (!existing) {
-      renderMessage(message);
-      return;
-    }
+    if (!existing) { renderMessage(message); return; }
 
     const decoded = decodeMessageBody(message.body);
     const content = existing.querySelector(".message-text");
     const time = existing.querySelector(".message-time");
-
-    if (content) {
-      content.textContent = message.deleted_at ? "This message was deleted." : decoded.text;
-    }
-
-    if (time) {
-      time.textContent = formatTime(message.created_at) + (message.edited_at ? " · edited" : "");
-    }
+    if (content) content.textContent = message.deleted_at ? "This message was deleted." : decoded.text;
+    if (time) time.textContent = formatTime(message.created_at) + (message.edited_at ? " · edited" : "");
   }
 
   function removeMessage(id) {
@@ -459,17 +433,15 @@
     event?.preventDefault();
     const input = $("messageInput");
     const text = input?.value.trim();
-
     if (!text || !state.room || !state.client) return;
 
     if (text.length > CONFIG.MAX_MESSAGE_LENGTH) {
-      showError("chatError", "Message 2000 characters se chhota hona chahiye.");
+      showError("chatError", "Message too long.");
       return;
     }
 
-    const button = $("sendBtn");
-    if (button) button.disabled = true;
-    showError("chatError");
+    const btn = $("sendBtn");
+    if (btn) btn.disabled = true;
 
     try {
       const { error } = await state.client.from("messages").insert({
@@ -477,15 +449,13 @@
         sender_id: state.senderId,
         body: encodeMessageBody(text, state.replyTarget)
       });
-
       if (error) throw error;
       input.value = "";
       cancelReply();
-    } catch (error) {
-      console.error("Send message:", error);
-      showError("chatError", error.message || "Message send nahi hua.");
+    } catch (err) {
+      showError("chatError", "Send failed.");
     } finally {
-      if (button) button.disabled = false;
+      if (btn) btn.disabled = false;
       input?.focus();
     }
   }
@@ -493,122 +463,77 @@
   async function editMessage(message) {
     if (message.sender_id !== state.senderId) return;
     const decoded = decodeMessageBody(message.body);
-    const replacement = prompt("Message edit karein:", decoded.text);
+    const replacement = prompt("Edit message:", decoded.text);
     if (replacement === null) return;
-
     const text = replacement.trim();
-    if (!text || text.length > CONFIG.MAX_MESSAGE_LENGTH) {
-      showError("chatError", "Invalid message length.");
-      return;
-    }
+    if (!text || text.length > CONFIG.MAX_MESSAGE_LENGTH) return;
 
     try {
-      const { error } = await state.client
+      await state.client
         .from("messages")
-        .update({
-          body: encodeMessageBody(text, decoded.replyTo),
-          edited_at: new Date().toISOString()
-        })
-        .eq("id", message.id)
-        .eq("sender_id", state.senderId);
-
-      if (error) throw error;
-    } catch (error) {
-      showError("chatError", error.message || "Edit fail hua.");
-    }
+        .update({ body: encodeMessageBody(text, decoded.replyTo), edited_at: new Date().toISOString() })
+        .eq("id", message.id);
+    } catch {}
   }
 
   async function deleteMessage(message) {
-    if (message.sender_id !== state.senderId) return;
-    if (!confirm("Message delete karna hai?")) return;
-
+    if (message.sender_id !== state.senderId || !confirm("Delete this message?")) return;
     try {
-      const { error } = await state.client
+      await state.client
         .from("messages")
-        .update({
-          deleted_at: new Date().toISOString(),
-          body: encodeMessageBody("This message was deleted.")
-        })
-        .eq("id", message.id)
-        .eq("sender_id", state.senderId);
-
-      if (error) throw error;
-    } catch (error) {
-      showError("chatError", error.message || "Delete fail hua.");
-    }
+        .update({ deleted_at: new Date().toISOString(), body: encodeMessageBody("This message was deleted.") })
+        .eq("id", message.id);
+    } catch {}
   }
 
   async function copyRoomCode() {
     if (!state.roomCode) return;
-    try {
-      await navigator.clipboard.writeText(state.roomCode);
-      setText("copyCodeBtn", "Copied!");
-      setTimeout(() => setText("copyCodeBtn", "Copy code"), 1500);
-    } catch {
-      showError("chatError", "Clipboard access nahi mila.");
-    }
+    await navigator.clipboard.writeText(state.roomCode);
+    setText("copyCodeBtn", "Copied!");
+    setTimeout(() => setText("copyCodeBtn", "Copy"), 1500);
+  }
+
+  function showQrCode() {
+    if (!state.roomCode) return;
+    const url = new URL(location.href);
+    url.searchParams.set("room", state.roomCode);
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url.href)}`;
+    $("qrImage").src = qrUrl;
+    $("qrModal")?.classList.remove("hidden");
   }
 
   async function shareRoom() {
-    if (!state.roomCode) {
-      setText("roomShareStatus", "Pehle room create ya join karein.");
-      return;
-    }
-
+    if (!state.roomCode) return;
     const url = new URL(location.href);
     url.searchParams.set("room", state.roomCode);
-
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: "Join my NETBAND room",
-          text: `Room code: ${state.roomCode}`,
-          url: url.href
-        });
-      } else {
-        await navigator.clipboard.writeText(url.href);
-        setText("roomShareStatus", "Room link copied!");
-        setTimeout(() => setText("roomShareStatus", ""), 3000);
-      }
-    } catch (err) {
-      if (err.name !== "AbortError") {
-        setText("roomShareStatus", "Link share nahi ho saka.");
-      }
+    if (navigator.share) {
+      await navigator.share({ title: "NETBAND Room", text: `Join room: ${state.roomCode}`, url: url.href });
+    } else {
+      await navigator.clipboard.writeText(url.href);
+      setText("roomShareStatus", "Link copied!");
+      setTimeout(() => setText("roomShareStatus", ""), 3000);
     }
   }
 
   function searchMessages(term) {
     state.searchTerm = String(term || "").toLowerCase();
-    document.querySelectorAll("#chatMessages .message").forEach(element => {
-      const text = element.querySelector(".message-text")?.textContent || "";
-      element.classList.toggle("hidden", !text.toLowerCase().includes(state.searchTerm));
+    document.querySelectorAll("#chatMessages .message").forEach(el => {
+      const txt = el.querySelector(".message-text")?.textContent || "";
+      el.classList.toggle("hidden", !txt.toLowerCase().includes(state.searchTerm));
     });
   }
 
   async function requestLiveKitToken() {
-    if (!state.client || !state.room) throw new Error("Pehle room join karein.");
-
     const { data, error } = await state.client.functions.invoke(CONFIG.TOKEN_FUNCTION, {
-      body: {
-        roomName: `netband-${state.room.id}`,
-        participantName: state.senderName
-      }
+      body: { roomName: `netband-${state.room.id}`, participantName: state.senderName }
     });
-
-    if (error) throw error;
-    if (!data?.token) throw new Error("LiveKit token nahi mila.");
+    if (error || !data?.token) throw new Error("LiveKit token request failed.");
     return data.token;
   }
 
   async function joinCall(withVideo = false) {
     if (state.callConnecting || state.call) return;
-    if (!livekitLibrary?.Room || !livekitLibrary?.createLocalTracks) {
-      showError("callError", "LiveKit client load nahi hua.");
-      return;
-    }
-
     state.callConnecting = true;
-    showError("callError");
     setText("callStatus", "Connecting...");
 
     try {
@@ -619,30 +544,23 @@
       registerCallEvents(call);
       await call.connect(CONFIG.LIVEKIT_URL, token);
 
-      const tracks = await livekitLibrary.createLocalTracks({
-        audio: true,
-        video: withVideo
-      });
-
+      const tracks = await livekitLibrary.createLocalTracks({ audio: true, video: withVideo });
       state.localTracks = tracks;
-      for (const track of tracks) {
-        await call.localParticipant.publishTrack(track);
-      }
+      for (const track of tracks) await call.localParticipant.publishTrack(track);
 
       $("joinVoiceBtn").disabled = true;
       $("joinVideoBtn").disabled = true;
       $("muteBtn").disabled = false;
       $("cameraBtn").disabled = false;
+      $("screenShareBtn").disabled = false;
       $("leaveCallBtn").disabled = false;
 
       setText("callStatus", "Call connected");
       updateParticipants();
       updateVideoGrid();
-    } catch (error) {
-      console.error("Join call:", error);
+    } catch (err) {
       await leaveCall();
-      showError("callError", error.message || "Call connect nahi hui.");
-      setText("callStatus", "Not in a call");
+      showError("callError", err.message || "Call connect failed.");
     } finally {
       state.callConnecting = false;
     }
@@ -650,21 +568,10 @@
 
   function registerCallEvents(call) {
     call
-      .on(livekitLibrary.RoomEvent.ParticipantConnected, () => {
-        updateParticipants();
-        updateVideoGrid();
-      })
-      .on(livekitLibrary.RoomEvent.ParticipantDisconnected, (participant) => {
-        detachParticipant(participant);
-        updateParticipants();
-        updateVideoGrid();
-      })
-      .on(livekitLibrary.RoomEvent.TrackSubscribed, (track, publication, participant) => {
-        attachTrack(track, participant);
-      })
-      .on(livekitLibrary.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
-        detachTrack(track, participant);
-      })
+      .on(livekitLibrary.RoomEvent.ParticipantConnected, () => { updateParticipants(); updateVideoGrid(); })
+      .on(livekitLibrary.RoomEvent.ParticipantDisconnected, p => { detachParticipant(p); updateParticipants(); updateVideoGrid(); })
+      .on(livekitLibrary.RoomEvent.TrackSubscribed, (t, pub, p) => attachTrack(t, p))
+      .on(livekitLibrary.RoomEvent.TrackUnsubscribed, (t, pub, p) => detachTrack(t, p))
       .on(livekitLibrary.RoomEvent.TrackMuted, updateParticipants)
       .on(livekitLibrary.RoomEvent.TrackUnmuted, updateParticipants)
       .on(livekitLibrary.RoomEvent.Disconnected, leaveCall);
@@ -677,33 +584,29 @@
       document.body.appendChild(audioEl);
       return;
     }
-
     if (track.kind !== "video") return;
 
     const grid = $("videoGrid");
     if (!grid) return;
-
     $("videoEmpty")?.remove();
-    const key = participant.identity;
 
+    const key = participant.identity;
     let tile = grid.querySelector(`[data-participant="${CSS.escape(key)}"]`);
     if (!tile) {
       tile = document.createElement("div");
       tile.className = "video-tile";
       tile.dataset.participant = key;
-
       const name = document.createElement("div");
       name.className = "video-label";
       name.textContent = participant.name || participant.identity;
-
       tile.appendChild(name);
       grid.appendChild(tile);
     }
 
-    const mediaElement = track.attach();
-    mediaElement.autoplay = true;
-    mediaElement.playsInline = true;
-    tile.insertBefore(mediaElement, tile.firstChild);
+    const mediaEl = track.attach();
+    mediaEl.autoplay = true;
+    mediaEl.playsInline = true;
+    tile.insertBefore(mediaEl, tile.firstChild);
   }
 
   function detachTrack(track, participant) {
@@ -714,8 +617,7 @@
   }
 
   function detachParticipant(participant) {
-    const tile = $("videoGrid")?.querySelector(`[data-participant="${CSS.escape(participant.identity)}"]`);
-    tile?.remove();
+    $("videoGrid")?.querySelector(`[data-participant="${CSS.escape(participant.identity)}"]`)?.remove();
   }
 
   function updateVideoGrid() {
@@ -727,16 +629,13 @@
     if (local) {
       const key = local.identity;
       let tile = grid.querySelector(`[data-participant="${CSS.escape(key)}"]`);
-
       if (!tile) {
         tile = document.createElement("div");
         tile.className = "video-tile";
         tile.dataset.participant = key;
-
         const name = document.createElement("div");
         name.className = "video-label";
         name.textContent = `${state.senderName} (You)`;
-
         tile.appendChild(name);
         grid.appendChild(tile);
       }
@@ -757,7 +656,7 @@
       const empty = document.createElement("div");
       empty.id = "videoEmpty";
       empty.className = "video-empty";
-      empty.innerHTML = `<span>◉</span><strong>No active call</strong><small>Join voice or video to connect with members.</small>`;
+      empty.innerHTML = `<span>◉</span><strong>No active call</strong><small>Join call to connect.</small>`;
       grid.appendChild(empty);
     }
   }
@@ -766,7 +665,6 @@
     const call = state.call;
     const list = $("participantList");
     if (!list) return;
-
     list.replaceChildren();
 
     if (!call) {
@@ -777,185 +675,130 @@
 
     const participants = [call.localParticipant, ...call.remoteParticipants.values()];
     setText("participantCount", String(participants.length));
-
     participants.forEach(p => {
       const row = document.createElement("div");
       row.className = "participant-item";
       const isYou = p === call.localParticipant;
-      const mic = p.isMicrophoneEnabled ? "🎤" : "🔇";
-      row.textContent = `${p.name || p.identity} ${isYou ? "(You)" : ""} · ${mic}`;
+      row.textContent = `${p.name || p.identity} ${isYou ? "(You)" : ""} · ${p.isMicrophoneEnabled ? "🎤" : "🔇"}`;
       list.appendChild(row);
     });
   }
 
   async function toggleMicrophone() {
-    const call = state.call;
-    if (!call) return;
-
-    try {
-      const enabled = call.localParticipant.isMicrophoneEnabled;
-      await call.localParticipant.setMicrophoneEnabled(!enabled);
-      setText("muteBtn", enabled ? "Unmute mic" : "Mute mic");
-      updateParticipants();
-    } catch (error) {
-      showError("callError", "Microphone toggle fail hua.");
-    }
+    if (!state.call) return;
+    const enabled = state.call.localParticipant.isMicrophoneEnabled;
+    await state.call.localParticipant.setMicrophoneEnabled(!enabled);
+    setText("muteBtn", enabled ? "Unmute mic" : "Mute mic");
+    updateParticipants();
   }
 
   async function toggleCamera() {
-    const call = state.call;
-    if (!call) return;
+    if (!state.call) return;
+    const enabled = state.call.localParticipant.isCameraEnabled;
+    await state.call.localParticipant.setCameraEnabled(!enabled);
+    setText("cameraBtn", enabled ? "Turn camera on" : "Turn camera off");
+    updateParticipants();
+    updateVideoGrid();
+  }
 
+  /* Screen Share Feature */
+  async function toggleScreenShare() {
+    if (!state.call) return;
     try {
-      const enabled = call.localParticipant.isCameraEnabled;
-      await call.localParticipant.setCameraEnabled(!enabled);
-      setText("cameraBtn", enabled ? "Turn camera on" : "Turn camera off");
-      updateParticipants();
+      state.isScreenSharing = !state.isScreenSharing;
+      await state.call.localParticipant.setScreenShareEnabled(state.isScreenSharing);
+      setText("screenShareBtn", state.isScreenSharing ? "Stop sharing" : "🖥 Share screen");
       updateVideoGrid();
-    } catch (error) {
-      showError("callError", "Camera toggle fail hua.");
+    } catch {
+      state.isScreenSharing = false;
+      setText("screenShareBtn", "🖥 Share screen");
+      showError("callError", "Screen share permissions denied.");
     }
   }
 
   async function leaveCall() {
     const call = state.call;
     state.call = null;
+    if (call) try { await call.disconnect(); } catch {}
 
-    if (call) {
-      try {
-        await call.disconnect();
-      } catch {}
-    }
-
-    state.localTracks.forEach(track => {
-      try { track.stop(); } catch {}
-    });
+    state.localTracks.forEach(t => { try { t.stop(); } catch {} });
     state.localTracks = [];
-
-    // Remove any attached remote audio elements
+    state.isScreenSharing = false;
     document.querySelectorAll("audio").forEach(el => el.remove());
 
     $("joinVoiceBtn").disabled = false;
     $("joinVideoBtn").disabled = false;
     $("muteBtn").disabled = true;
     $("cameraBtn").disabled = true;
+    $("screenShareBtn").disabled = true;
     $("leaveCallBtn").disabled = true;
 
     setText("muteBtn", "Mute mic");
     setText("cameraBtn", "Turn camera on");
+    setText("screenShareBtn", "🖥 Share screen");
     setText("callStatus", "Not in a call");
 
     $("videoGrid")?.replaceChildren();
-    if ($("videoGrid")) {
-      const empty = document.createElement("div");
-      empty.id = "videoEmpty";
-      empty.className = "video-empty";
-      empty.innerHTML = `<span>◉</span><strong>No active call</strong><small>Join voice or video to connect with members.</small>`;
-      $("videoGrid").appendChild(empty);
-    }
-
+    updateVideoGrid();
     updateParticipants();
   }
 
   async function leaveRoom() {
     clearInterval(state.timer);
-    state.timer = null;
-
     await leaveCall();
     await disconnectRealtime();
 
     state.room = null;
     state.roomCode = null;
-    state.expiresAt = null;
-    state.replyTarget = null;
-    state.seen.clear();
-    state.messages.clear();
-
     $("chatPanel")?.classList.add("hidden");
     $("setupPanel")?.classList.remove("hidden");
-    $("replyComposerPreview")?.classList.add("hidden");
-
-    if ($("chatMessages")) {
-      $("chatMessages").replaceChildren();
-      const empty = document.createElement("div");
-      empty.className = "empty-state";
-      empty.innerHTML = `<span>✧</span><strong>Your conversation starts here</strong><p>Share the room code with the person you want to chat with.</p>`;
-      $("chatMessages").appendChild(empty);
-    }
 
     const url = new URL(location.href);
     url.searchParams.delete("room");
     history.replaceState({}, "", url);
-
-    showError("chatError");
-    showError("callError");
   }
 
   function setupEventListeners() {
     $("createBtn")?.addEventListener("click", createRoom);
-
-    $("joinForm")?.addEventListener("submit", event => {
-      event.preventDefault();
-      joinRoom($("roomInput")?.value);
-    });
-
-    $("roomInput")?.addEventListener("input", event => {
-      event.target.value = event.target.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, "");
-    });
+    $("joinForm")?.addEventListener("submit", e => { e.preventDefault(); joinRoom($("roomInput")?.value); });
+    $("roomInput")?.addEventListener("input", e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, ""); });
 
     $("messageForm")?.addEventListener("submit", sendMessage);
+    $("messageInput")?.addEventListener("input", emitTyping);
+
     $("cancelReplyBtn")?.addEventListener("click", cancelReply);
     $("copyCodeBtn")?.addEventListener("click", copyRoomCode);
+    $("showQrBtn")?.addEventListener("click", showQrCode);
+    $("closeQrBtn")?.addEventListener("click", () => $("qrModal")?.classList.add("hidden"));
     $("shareRoomBtn")?.addEventListener("click", shareRoom);
 
-    $("messageSearch")?.addEventListener("input", e => searchMessages(e.target.value));
-
-    $("leaveBtn")?.addEventListener("click", async () => {
-      if (confirm("Room chhodna hai?")) await leaveRoom();
+    $("muteSoundBtn")?.addEventListener("click", () => {
+      state.soundEnabled = !state.soundEnabled;
+      setText("muteSoundBtn", state.soundEnabled ? "🔔 Sound: ON" : "🔕 Sound: OFF");
     });
+
+    $("messageSearch")?.addEventListener("input", e => searchMessages(e.target.value));
+    $("leaveBtn")?.addEventListener("click", () => { if (confirm("Leave room?")) leaveRoom(); });
 
     $("joinVoiceBtn")?.addEventListener("click", () => joinCall(false));
     $("joinVideoBtn")?.addEventListener("click", () => joinCall(true));
     $("muteBtn")?.addEventListener("click", toggleMicrophone);
     $("cameraBtn")?.addEventListener("click", toggleCamera);
+    $("screenShareBtn")?.addEventListener("click", toggleScreenShare);
     $("leaveCallBtn")?.addEventListener("click", leaveCall);
-
-    $("attachmentBtn")?.addEventListener("click", () => $("attachmentInput")?.click());
-    $("attachmentInput")?.addEventListener("change", (e) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        if (file.size > 10 * 1024 * 1024) {
-          alert("File maximum 10MB ki honi chahiye.");
-          e.target.value = "";
-          return;
-        }
-        alert(`File selected: ${file.name}`);
-        e.target.value = "";
-      }
-    });
 
     window.addEventListener("online", setNetworkStatus);
     window.addEventListener("offline", setNetworkStatus);
-    window.addEventListener("pagehide", () => {
-      clearInterval(state.timer);
-      if (state.call) state.call.disconnect();
-    });
   }
 
   async function start() {
     setNetworkStatus();
     setupEventListeners();
-
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("./sw.js").catch(() => {});
-    }
-
     const params = new URLSearchParams(location.search);
-    const roomCode = params.get("room");
-
-    if (roomCode) {
-      if ($("roomInput")) $("roomInput").value = roomCode.toUpperCase();
-      await joinRoom(roomCode);
+    const code = params.get("room");
+    if (code) {
+      if ($("roomInput")) $("roomInput").value = code.toUpperCase();
+      await joinRoom(code);
     }
   }
 

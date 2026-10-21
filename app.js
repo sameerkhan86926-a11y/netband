@@ -10,8 +10,8 @@
   // ==========================================
 
   const config = {
-    url: "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE",
-    key: "PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE"
+    url: "https://frjzfmskbkcogeeqytjm.supabase.co",
+    key: "sb_publishable_CIl_axgZv5JixyEKj_-d5A_xypfty-U"
   };
 
   // ==========================================
@@ -93,9 +93,9 @@
 
     if (
       !config.url.startsWith("https://") ||
-      config.url.includes("https://frjzfmskbkcogeeqytjm.supabase.co") ||
+      config.url.includes("PASTE_YOUR_") ||
       !config.key ||
-      config.key.includes("sb_publishable_CIl_axgZv5JixyEKj_-d5A_xypfty-U")
+      config.key.includes("PASTE_YOUR_")
     ) {
       throw new Error(
         "NETBAND configuration is incomplete. The site owner needs to add the Supabase Project URL and Publishable Key in app.js."

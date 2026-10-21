@@ -4,8 +4,8 @@
   const $ = (id) => document.getElementById(id);
 
   // ==========================================
-  // NETBAND CONFIGURATION
-  // Enter your Supabase details here.
+  // SUPABASE CONFIGURATION
+  // Replace both placeholders with your actual values.
   // Never use a secret/service_role key.
   // ==========================================
 
@@ -14,9 +14,7 @@
     key: "sb_publishable_CIl_axgZv5JixyEKj_-d5A_xypfty-U"
   };
 
-  // ==========================================
-  // APPLICATION STATE
-  // ==========================================
+  const MESSAGE_PREFIX = "__NETBAND_V2__:";
 
   const state = {
     client: null,
@@ -26,7 +24,9 @@
     expiresAt: null,
     seen: new Set(),
     senderId: getSenderId(),
-    busy: false
+    busy: false,
+    replyTarget: null,
+    joining: false
   };
 
   // ==========================================
@@ -43,7 +43,6 @@
       }
 
       return id;
-
     } catch {
       return crypto.randomUUID();
     }
@@ -61,14 +60,14 @@
 
     $("onlineDot").classList.toggle("online", online);
 
-    if (state.room) {
-      if (!online) {
-        $("chatStatus").textContent =
-          "Offline • messages cannot reach other devices";
-      } else if (!state.channel) {
-        $("chatStatus").textContent =
-          "Internet available • reconnecting";
-      }
+    if (!state.room) return;
+
+    if (!online) {
+      $("chatStatus").textContent =
+        "Offline · messages cannot be sent";
+    } else if (!state.channel) {
+      $("chatStatus").textContent =
+        "Internet available · reconnecting";
     }
   }
 
@@ -78,14 +77,11 @@
   setNetwork();
 
   // ==========================================
-  // SUPABASE CONNECTION
+  // SUPABASE CLIENT
   // ==========================================
 
   function backendReady() {
-    if (
-      !window.supabase ||
-      !window.supabase.createClient
-    ) {
+    if (!window.supabase?.createClient) {
       throw new Error(
         "Chat service could not load. Check your internet connection and refresh."
       );
@@ -93,12 +89,12 @@
 
     if (
       !config.url.startsWith("https://") ||
-      config.url.includes("PASTE_YOUR_") ||
+      config.url === "SUPABASE_PROJECT_URL" ||
       !config.key ||
-      config.key.includes("PASTE_YOUR_")
+      config.key === "SUPABASE_PUBLISHABLE_KEY"
     ) {
       throw new Error(
-        "NETBAND configuration is incomplete. The site owner needs to add the Supabase Project URL and Publishable Key in app.js."
+        "Add your Supabase Project URL and publishable key in app.js."
       );
     }
 
@@ -113,15 +109,12 @@
   }
 
   // ==========================================
-  // ROOM CODE GENERATOR
+  // ROOM CODE
   // ==========================================
 
   function generateRoomCode() {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-    const bytes = crypto.getRandomValues(
-      new Uint8Array(8)
-    );
+    const bytes = crypto.getRandomValues(new Uint8Array(8));
 
     return Array.from(
       bytes,
@@ -130,7 +123,7 @@
   }
 
   // ==========================================
-  // ERROR DISPLAY
+  // ERROR HANDLING
   // ==========================================
 
   function showError(id, message) {
@@ -142,7 +135,143 @@
   }
 
   // ==========================================
-  // SAFE MESSAGE RENDERING
+  // MESSAGE ENCODING
+  // ==========================================
+
+  function encodeMessageBody(text, replyTo) {
+    if (!replyTo) return text;
+
+    return MESSAGE_PREFIX + JSON.stringify({
+      text,
+      replyTo: {
+        id: replyTo.id,
+        text: String(replyTo.text || "").slice(0, 300)
+      }
+    });
+  }
+
+  function parseMessageBody(rawBody) {
+    const text = String(rawBody || "");
+
+    if (text.startsWith(MESSAGE_PREFIX)) {
+      try {
+        const parsed = JSON.parse(
+          text.slice(MESSAGE_PREFIX.length)
+        );
+
+        if (parsed && typeof parsed.text === "string") {
+          return {
+            text: parsed.text,
+            replyTo: parsed.replyTo || null
+          };
+        }
+      } catch {
+        // Treat malformed metadata as ordinary text below.
+      }
+    }
+
+    return {
+      text,
+      replyTo: null
+    };
+  }
+
+  // ==========================================
+  // EMPTY STATE
+  // ==========================================
+
+  function showEmptyState() {
+    const container = $("chatMessages");
+
+    if (container.querySelector(".message")) return;
+
+    container.replaceChildren();
+
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+
+    const icon = document.createElement("span");
+    icon.textContent = "✧";
+
+    const title = document.createElement("strong");
+    title.textContent = "Your conversation starts here";
+
+    const description = document.createElement("p");
+    description.textContent =
+      "Share the room code with the person you want to chat with.";
+
+    empty.append(icon, title, description);
+    container.appendChild(empty);
+  }
+
+  // ==========================================
+  // COPY TEXT
+  // ==========================================
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      const textarea = document.createElement("textarea");
+
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+
+      document.body.appendChild(textarea);
+      textarea.select();
+
+      let copied = false;
+
+      try {
+        copied = document.execCommand("copy");
+      } catch {
+        copied = false;
+      }
+
+      textarea.remove();
+
+      if (!copied) {
+        window.prompt("Copy this text:", text);
+      }
+
+      return copied;
+    }
+  }
+
+  // ==========================================
+  // REPLY PREVIEW
+  // ==========================================
+
+  function setReplyTarget(message, text) {
+    state.replyTarget = {
+      id: message.id,
+      text: String(text || "").slice(0, 300)
+    };
+
+    $("replyPreviewText").textContent =
+      state.replyTarget.text;
+
+    $("replyComposerPreview").classList.remove("hidden");
+
+    $("messageInput").focus();
+  }
+
+  function clearReplyTarget() {
+    state.replyTarget = null;
+
+    $("replyComposerPreview").classList.add("hidden");
+    $("replyPreviewText").textContent = "";
+  }
+
+  $("cancelReplyBtn").addEventListener(
+    "click",
+    clearReplyTarget
+  );
+
+  // ==========================================
+  // RENDER MESSAGE
   // ==========================================
 
   function renderMessage(message) {
@@ -153,14 +282,13 @@
     state.seen.add(message.id);
 
     const container = $("chatMessages");
-
     const empty = container.querySelector(".empty-state");
 
-    if (empty) {
-      empty.remove();
-    }
+    if (empty) empty.remove();
 
-    const div = document.createElement("div");
+    const parsed = parseMessageBody(message.body);
+
+    const div = document.createElement("article");
 
     div.className =
       "message" +
@@ -170,21 +298,39 @@
           : ""
       );
 
+    div.dataset.messageId = String(message.id);
+
     const sender = document.createElement("div");
-
     sender.className = "sender";
-
     sender.textContent =
       message.sender_id === state.senderId
         ? "YOU"
         : "ROOM MEMBER";
 
+    div.appendChild(sender);
+
+    if (parsed.replyTo) {
+      const quote = document.createElement("div");
+      quote.className = "reply-preview";
+
+      const quoteLabel = document.createElement("strong");
+      quoteLabel.textContent = "↩ Replying to";
+
+      const quoteText = document.createElement("span");
+      quoteText.textContent = parsed.replyTo.text || "Message";
+
+      quote.append(quoteLabel, quoteText);
+      div.appendChild(quote);
+    }
+
     const body = document.createElement("div");
-
     body.className = "body";
+    body.textContent = parsed.text;
 
-    // textContent prevents messages from being interpreted as HTML.
-    body.textContent = String(message.body || "");
+    div.appendChild(body);
+
+    const footer = document.createElement("div");
+    footer.className = "message-actions";
 
     const time = document.createElement("time");
 
@@ -192,59 +338,76 @@
       message.created_at || Date.now()
     );
 
-    time.textContent = date.toLocaleTimeString(
-      [],
-      {
-        hour: "2-digit",
-        minute: "2-digit"
-      }
-    );
+    time.dateTime = date.toISOString();
 
-    div.appendChild(sender);
-    div.appendChild(body);
-    div.appendChild(time);
+    time.textContent = date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    const actions = document.createElement("div");
+    actions.className = "message-buttons";
+
+    const replyBtn = document.createElement("button");
+    replyBtn.type = "button";
+    replyBtn.className = "message-action";
+    replyBtn.textContent = "↩ Reply";
+
+    replyBtn.addEventListener("click", () => {
+      setReplyTarget(message, parsed.text);
+    });
+
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "message-action";
+    copyBtn.textContent = "Copy";
+
+    copyBtn.addEventListener("click", async () => {
+      const originalText = parsed.text;
+
+      await copyText(originalText);
+
+      copyBtn.textContent = "Copied!";
+
+      setTimeout(() => {
+        copyBtn.textContent = "Copy";
+      }, 1200);
+    });
+
+    actions.append(replyBtn, copyBtn);
+    footer.append(time, actions);
+    div.appendChild(footer);
 
     container.appendChild(div);
-
     container.scrollTop = container.scrollHeight;
   }
 
   // ==========================================
-  // SHOW CHAT ROOM
+  // SHOW ROOM
   // ==========================================
 
   function showChat(room) {
     state.room = room;
-
-    state.expiresAt = new Date(
-      room.expires_at
-    ).getTime();
+    state.expiresAt = new Date(room.expires_at).getTime();
 
     $("setupPanel").classList.add("hidden");
-
     $("chatPanel").classList.remove("hidden");
 
     $("roomCodeDisplay").textContent = room.code;
-
     $("chatTitle").textContent = "Temporary room";
 
-    $("chatMessages").innerHTML = `
-      <div class="empty-state">
-        <span>✧</span>
-        <strong>Your conversation starts here</strong>
-        <p>Share the room code with the person you want to chat with.</p>
-      </div>
-    `;
-
+    $("chatMessages").replaceChildren();
     state.seen.clear();
-
-    startTimer();
+    clearReplyTarget();
+    showEmptyState();
 
     $("chatStatus").textContent = "Connecting…";
+
+    startTimer();
   }
 
   // ==========================================
-  // ROOM EXPIRY TIMER
+  // ROOM TIMER
   // ==========================================
 
   function startTimer() {
@@ -261,13 +424,8 @@
         state.expiresAt - Date.now()
       );
 
-      const minutes = Math.floor(
-        remaining / 60000
-      );
-
-      const seconds = Math.floor(
-        (remaining % 60000) / 1000
-      );
+      const minutes = Math.floor(remaining / 60000);
+      const seconds = Math.floor((remaining % 60000) / 1000);
 
       $("expiryTitle").textContent =
         remaining > 0
@@ -275,11 +433,9 @@
           : "Room expired";
 
       $("expiryBar").style.width =
-        `${Math.max(0, remaining / 1800000 * 100)}%`;
+        `${Math.min(100, remaining / 1800000 * 100)}%`;
 
       if (remaining <= 0) {
-        clearInterval(state.timer);
-
         await leaveRoom(true);
 
         alert(
@@ -289,7 +445,6 @@
     };
 
     tick();
-
     state.timer = setInterval(tick, 1000);
   }
 
@@ -298,9 +453,7 @@
   // ==========================================
 
   async function connectRoom(roomCode, createNew) {
-    if (state.busy) {
-      return;
-    }
+    if (state.busy) return;
 
     state.busy = true;
 
@@ -311,33 +464,22 @@
 
     try {
       const client = backendReady();
-
       let room;
 
       if (createNew) {
-        // Create a room.
-        // Database should set expires_at automatically.
         const { data, error } = await client
           .from("rooms")
           .insert({
             code: generateRoomCode()
           })
-          .select(
-            "id,code,created_at,expires_at"
-          )
+          .select("id,code,created_at,expires_at")
           .single();
 
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
         room = data;
-
       } else {
-        // Join an existing room.
-        const normalizedCode = roomCode
-          .trim()
-          .toUpperCase();
+        const normalizedCode = roomCode.trim().toUpperCase();
 
         if (!/^[A-HJ-NP-Z2-9]{8}$/.test(normalizedCode)) {
           throw new Error(
@@ -347,19 +489,12 @@
 
         const { data, error } = await client
           .from("rooms")
-          .select(
-            "id,code,created_at,expires_at"
-          )
+          .select("id,code,created_at,expires_at")
           .eq("code", normalizedCode)
-          .gt(
-            "expires_at",
-            new Date().toISOString()
-          )
+          .gt("expires_at", new Date().toISOString())
           .maybeSingle();
 
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
         if (!data) {
           throw new Error(
@@ -375,41 +510,28 @@
         !room.expires_at ||
         new Date(room.expires_at).getTime() <= Date.now()
       ) {
-        throw new Error(
-          "This room has expired. Create a new room."
-        );
+        throw new Error("This room has expired.");
       }
 
-      showChat(room);
-
-      // Load previous messages.
-      const {
-        data: oldMessages,
-        error: fetchError
-      } = await client
-        .from("messages")
-        .select(
-          "id,room_id,sender_id,body,created_at"
-        )
-        .eq("room_id", room.id)
-        .order("created_at", {
-          ascending: true
-        })
-        .limit(200);
-
-      if (fetchError) {
-        throw fetchError;
-      }
-
-      (oldMessages || []).forEach(renderMessage);
-
-      // Remove previous subscription if one exists.
+      // Close previous channel before switching rooms.
       if (state.channel) {
         await client.removeChannel(state.channel);
         state.channel = null;
       }
 
-      // Subscribe to realtime messages.
+      showChat(room);
+
+      const { data: oldMessages, error: fetchError } = await client
+        .from("messages")
+        .select("id,room_id,sender_id,body,created_at")
+        .eq("room_id", room.id)
+        .order("created_at", { ascending: true })
+        .limit(200);
+
+      if (fetchError) throw fetchError;
+
+      (oldMessages || []).forEach(renderMessage);
+
       state.channel = client
         .channel("room-" + room.id)
         .on(
@@ -422,8 +544,9 @@
           },
           payload => {
             if (
+              state.room &&
               payload.new &&
-              payload.new.room_id === room.id
+              payload.new.room_id === state.room.id
             ) {
               renderMessage(payload.new);
             }
@@ -432,7 +555,13 @@
         .subscribe(status => {
           if (status === "SUBSCRIBED") {
             $("chatStatus").textContent =
-              "Connected • realtime active";
+              "Connected · realtime active";
+          } else if (status === "CHANNEL_ERROR") {
+            $("chatStatus").textContent =
+              "Realtime connection error";
+          } else if (status === "TIMED_OUT") {
+            $("chatStatus").textContent =
+              "Connection timed out";
           } else {
             $("chatStatus").textContent =
               "Connection: " + status.toLowerCase();
@@ -445,16 +574,17 @@
       showError(
         "setupError",
         error.message ||
-          "Could not connect. Check the Supabase configuration and SQL policies."
+          "Could not connect. Check your Supabase settings and permissions."
       );
 
       if (state.room) {
+        clearInterval(state.timer);
+        state.room = null;
+        state.expiresAt = null;
+
         $("chatPanel").classList.add("hidden");
         $("setupPanel").classList.remove("hidden");
-
-        state.room = null;
       }
-
     } finally {
       state.busy = false;
       $("createBtn").disabled = false;
@@ -462,29 +592,22 @@
   }
 
   // ==========================================
-  // CREATE ROOM BUTTON
+  // CREATE ROOM
   // ==========================================
 
-  $("createBtn").addEventListener(
-    "click",
-    () => connectRoom("", true)
-  );
+  $("createBtn").addEventListener("click", () => {
+    connectRoom("", true);
+  });
 
   // ==========================================
-  // JOIN ROOM FORM
+  // JOIN ROOM
   // ==========================================
 
-  $("joinForm").addEventListener(
-    "submit",
-    event => {
-      event.preventDefault();
+  $("joinForm").addEventListener("submit", event => {
+    event.preventDefault();
 
-      connectRoom(
-        $("roomInput").value,
-        false
-      );
-    }
-  );
+    connectRoom($("roomInput").value, false);
+  });
 
   // ==========================================
   // SEND MESSAGE
@@ -498,53 +621,46 @@
       showError("chatError", "");
 
       const input = $("messageInput");
-
       const body = input.value.trim();
 
-      if (!body || !state.room) {
-        return;
-      }
+      if (!body || !state.room) return;
 
       if (!navigator.onLine) {
         showError(
           "chatError",
           "You are offline. This message has not been sent."
         );
-
         return;
       }
 
       if (Date.now() >= state.expiresAt) {
-        showError(
-          "chatError",
-          "This room has expired."
-        );
-
+        showError("chatError", "This room has expired.");
         return;
       }
 
-      const sendButton = document.querySelector(
-        "#messageForm button[type='submit']"
-      );
-
+      const sendButton = $("sendBtn");
       sendButton.disabled = true;
 
       try {
         const client = backendReady();
+
+        const messageBody = encodeMessageBody(
+          body,
+          state.replyTarget
+        );
 
         const { error } = await client
           .from("messages")
           .insert({
             room_id: state.room.id,
             sender_id: state.senderId,
-            body
+            body: messageBody
           });
 
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
         input.value = "";
+        clearReplyTarget();
 
       } catch (error) {
         showError(
@@ -552,7 +668,6 @@
           "Message not sent: " +
             (error.message || "Check your connection.")
         );
-
       } finally {
         sendButton.disabled = false;
         input.focus();
@@ -564,32 +679,18 @@
   // COPY ROOM CODE
   // ==========================================
 
-  $("copyCodeBtn").addEventListener(
-    "click",
-    async () => {
-      if (!state.room) {
-        return;
-      }
+  $("copyCodeBtn").addEventListener("click", async () => {
+    if (!state.room) return;
 
-      const code = state.room.code;
+    await copyText(state.room.code);
 
-      try {
-        await navigator.clipboard.writeText(code);
+    const button = $("copyCodeBtn");
+    button.textContent = "Copied!";
 
-        $("copyCodeBtn").textContent = "Copied!";
-
-        setTimeout(() => {
-          $("copyCodeBtn").textContent = "Copy";
-        }, 1500);
-
-      } catch {
-        prompt(
-          "Copy this room code:",
-          code
-        );
-      }
-    }
-  );
+    setTimeout(() => {
+      button.textContent = "Copy code";
+    }, 1200);
+  });
 
   // ==========================================
   // LEAVE ROOM
@@ -597,19 +698,13 @@
 
   async function leaveRoom(expired = false) {
     clearInterval(state.timer);
-
     state.timer = null;
 
     if (state.channel && state.client) {
       try {
-        await state.client.removeChannel(
-          state.channel
-        );
+        await state.client.removeChannel(state.channel);
       } catch (error) {
-        console.error(
-          "Could not close realtime channel:",
-          error
-        );
+        console.warn("Could not close realtime channel.");
       }
     }
 
@@ -617,19 +712,15 @@
     state.room = null;
     state.expiresAt = null;
 
+    clearReplyTarget();
+
     $("chatPanel").classList.add("hidden");
-
     $("setupPanel").classList.remove("hidden");
-
     $("roomInput").value = "";
 
-    $("chatMessages").innerHTML = `
-      <div class="empty-state">
-        <span>✧</span>
-        <strong>Your conversation starts here</strong>
-        <p>Share the room code with the person you want to chat with.</p>
-      </div>
-    `;
+    $("chatMessages").replaceChildren();
+    state.seen.clear();
+    showEmptyState();
 
     if (expired) {
       showError(
@@ -639,10 +730,9 @@
     }
   }
 
-  $("leaveBtn").addEventListener(
-    "click",
-    () => leaveRoom(false)
-  );
+  $("leaveBtn").addEventListener("click", () => {
+    leaveRoom(false);
+  });
 
   // ==========================================
   // SERVICE WORKER
@@ -653,12 +743,8 @@
       navigator.serviceWorker
         .register("./sw.js")
         .catch(error => {
-          console.warn(
-            "Service worker registration failed:",
-            error
-          );
+          console.warn("Service worker registration failed.");
         });
     });
   }
-
 })();

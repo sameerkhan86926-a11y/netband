@@ -5,50 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#08111f">
 
-  <title>NETBAND — Private Temporary Chat</title>
+  <title>NETBAND 2.0 — Temporary Messaging</title>
 
   <meta name="description"
-        content="NETBAND is a temporary room-based chat. Create a room, share the code, and start chatting without an account.">
+    content="NETBAND is a temporary room-based messaging platform. Create a room, share the code, and chat without an account.">
 
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
-
-  <style>
-    [hidden] {
-      display: none !important;
-    }
-
-    .error {
-      color: #ff8585;
-      overflow-wrap: anywhere;
-    }
-
-    .text-button {
-      cursor: pointer;
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-  </style>
 </head>
 
 <body>
-
   <div class="ambient ambient-one"></div>
   <div class="ambient ambient-two"></div>
 
-  <!-- HEADER -->
-
   <header class="topbar">
-
     <a class="brand" href="./">
       <span class="brand-mark">N</span>
-
-      <span>
+      <span class="brand-name">
         NETBAND
-        <small>PRIVATE • TEMPORARY • SIMPLE</small>
+        <small>PRIVATE · TEMPORARY · SIMPLE</small>
       </span>
     </a>
 
@@ -56,78 +31,51 @@
       <i id="onlineDot"></i>
       <span id="networkLabel">Checking connection…</span>
     </div>
-
   </header>
 
   <main class="shell">
-
-    <!-- HERO -->
-
     <section class="hero">
-
       <div class="eyebrow">
         <span class="pulse"></span>
         TEMPORARY COMMUNICATION
       </div>
 
-      <h1>
-        Your space.<br>
-        <span>Your conversation.</span>
-      </h1>
+      <h1>Your space.<br><span>Your conversation.</span></h1>
 
       <p>
-        Create a room, share its code, and chat without creating
-        an account. Rooms are designed to expire after 30 minutes.
+        Create a room, share its code, and start chatting
+        without creating an account.
       </p>
 
       <div class="hero-pills">
         <span>◈ No account</span>
         <span>◷ 30-minute rooms</span>
-        <span>⌁ Realtime chat</span>
+        <span>⌁ Realtime messaging</span>
       </div>
-
     </section>
 
-    <!-- CREATE / JOIN ROOM -->
-
     <section class="panel setup-panel" id="setupPanel">
-
       <div class="panel-heading">
-
         <div>
           <span class="step">01 / CONNECT</span>
           <h2>Start a temporary room</h2>
         </div>
 
         <span class="lock-icon">⌑</span>
-
       </div>
 
       <p class="muted">
-        Create a new room or join one using a room code from your friend.
+        Create a new room or join an existing room using its code.
       </p>
 
-      <div class="button-row">
+      <button id="createBtn" class="button primary" type="button">
+        ＋ Create room
+      </button>
 
-        <button
-          id="createBtn"
-          class="button primary"
-          type="button"
-        >
-          ＋ Create room
-        </button>
-
-      </div>
-
-      <div class="divider">
-        <span>OR JOIN A ROOM</span>
-      </div>
+      <div class="divider"><span>OR JOIN A ROOM</span></div>
 
       <form id="joinForm" class="join-row">
-
-        <label class="sr-only" for="roomInput">
-          Room code
-        </label>
+        <label class="sr-only" for="roomInput">Room code</label>
 
         <input
           id="roomInput"
@@ -139,101 +87,47 @@
           required
         >
 
-        <button
-          class="button secondary"
-          type="submit"
-        >
+        <button class="button secondary" type="submit">
           Join room ↗
         </button>
-
       </form>
 
-      <!-- Backend configuration is handled by app.js -->
-
-      <details class="config" hidden>
-        <summary>Backend setup</summary>
-      </details>
-
-      <p
-        id="setupError"
-        class="error"
-        aria-live="polite"
-      ></p>
-
+      <p id="setupError" class="error" aria-live="polite"></p>
     </section>
 
-    <!-- CHAT ROOM -->
-
-    <section
-      class="panel chat-panel hidden"
-      id="chatPanel"
-    >
-
+    <section class="panel chat-panel hidden" id="chatPanel">
       <div class="chat-top">
-
         <div>
-
           <span class="step">02 / LIVE ROOM</span>
-
-          <h2 id="chatTitle">
-            Temporary room
-          </h2>
+          <h2 id="chatTitle">Temporary room</h2>
 
           <div class="room-meta">
-
             CODE
+            <strong id="roomCodeDisplay">--------</strong>
 
-            <strong id="roomCodeDisplay">
-              --------
-            </strong>
-
-            <button
-              id="copyCodeBtn"
-              class="text-button"
-              type="button"
-            >
-              Copy
+            <button id="copyCodeBtn" class="text-button" type="button">
+              Copy code
             </button>
-
           </div>
-
         </div>
 
-        <button
-          id="leaveBtn"
-          class="button ghost"
-          type="button"
-        >
+        <button id="leaveBtn" class="button ghost" type="button">
           Leave
         </button>
-
       </div>
 
-      <!-- EXPIRY TIMER -->
-
       <div class="expiry">
-
         <span>◷</span>
 
-        <div>
-
-          <strong id="expiryTitle">
-            Room expires in 30:00
-          </strong>
-
-          <small>
-            Messages are temporary. Save anything important yourself.
-          </small>
-
+        <div class="expiry-copy">
+          <strong id="expiryTitle">Room expires in 30:00</strong>
+          <small>Save anything important before leaving.</small>
         </div>
 
         <div class="expiry-track">
           <span id="expiryBar"></span>
         </div>
-
       </div>
-
-      <!-- MESSAGES -->
 
       <div
         id="chatMessages"
@@ -242,36 +136,26 @@
         aria-live="polite"
         aria-relevant="additions"
       >
-
         <div class="empty-state">
-
           <span>✧</span>
-
-          <strong>
-            Your conversation starts here
-          </strong>
-
-          <p>
-            Share the room code with the person you want to chat with.
-          </p>
-
+          <strong>Your conversation starts here</strong>
+          <p>Share the room code with the person you want to chat with.</p>
         </div>
-
       </div>
 
-      <!-- MESSAGE INPUT -->
+      <div id="replyComposerPreview" class="reply-composer-preview hidden">
+        <div>
+          <strong>Replying to message</strong>
+          <span id="replyPreviewText"></span>
+        </div>
 
-      <form
-        id="messageForm"
-        class="composer"
-      >
+        <button id="cancelReplyBtn" type="button" aria-label="Cancel reply">
+          ✕
+        </button>
+      </div>
 
-        <label
-          class="sr-only"
-          for="messageInput"
-        >
-          Message
-        </label>
+      <form id="messageForm" class="composer">
+        <label class="sr-only" for="messageInput">Message</label>
 
         <input
           id="messageInput"
@@ -282,105 +166,48 @@
         >
 
         <button
+          id="sendBtn"
           class="send-button"
           aria-label="Send message"
           type="submit"
-        >
-          ↑
-        </button>
-
+        >↑</button>
       </form>
 
       <div class="chat-footer">
-
-        <span id="chatStatus">
-          Not connected
-        </span>
-
-        <span>
-          Never share sensitive information.
-        </span>
-
+        <span id="chatStatus">Connecting…</span>
+        <span>Never share sensitive information.</span>
       </div>
 
-      <p
-        id="chatError"
-        class="error"
-        aria-live="polite"
-      ></p>
-
+      <p id="chatError" class="error" aria-live="polite"></p>
     </section>
-
-    <!-- INFORMATION CARDS -->
 
     <section class="info-grid">
-
       <article class="info-card">
-
         <span class="info-icon">⌁</span>
-
         <h3>Simple connection</h3>
-
-        <p>
-          Open NETBAND, create a room, share the code,
-          and start chatting.
-        </p>
-
+        <p>Create a room, share the code, and start messaging.</p>
       </article>
 
       <article class="info-card">
-
         <span class="info-icon">◷</span>
-
         <h3>Temporary by design</h3>
-
-        <p>
-          Rooms expire after 30 minutes. Database cleanup
-          must also be enabled in Supabase.
-        </p>
-
+        <p>Server-side cleanup must be configured for database deletion.</p>
       </article>
 
       <article class="info-card">
-
         <span class="info-icon">⌘</span>
-
-        <h3>Online messaging</h3>
-
-        <p>
-          Internet access is required to exchange messages
-          between different phones.
-        </p>
-
+        <h3>Realtime messaging</h3>
+        <p>Internet access is required to exchange messages between phones.</p>
       </article>
-
     </section>
 
-    <!-- FOOTER -->
-
     <footer>
-
-      <span>
-        NETBAND
-        <span class="copyright">/</span>
-        EARLY ACCESS
-      </span>
-
-      <span>
-        Built for connection, designed with care.
-      </span>
-
+      <span>NETBAND <span class="copyright">/</span> VERSION 2.0</span>
+      <span>Built for connection, designed with care.</span>
     </footer>
-
   </main>
 
-  <!-- SUPABASE CLIENT LIBRARY -->
-
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- NETBAND APPLICATION -->
-
   <script src="app.js"></script>
-
 </body>
 </html>

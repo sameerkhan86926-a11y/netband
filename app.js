@@ -721,9 +721,7 @@
     setNetworkStatus();
     setupEventListeners();
 
-    const avatarInitial = (state.senderName || "U").slice(0, 1).toUpperCase();
-    setText("myAvatar", avatarInitial);
-
+    
     const params = new URLSearchParams(location.search);
     const code = params.get("room");
     if (code) {

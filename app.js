@@ -412,8 +412,10 @@
 
     playBtn.onclick = () => {
       if (audio.paused) {
-        document.querySelectorAll("audio").forEach(a => a !== audio && a.pause());
-        audio.play();
+        document.querySelectorAll("audio").forEach(a => {
+          if (a !== audio) a.pause();
+        });
+        audio.play().catch(() => {});
         playBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
       } else {
         audio.pause();
@@ -462,7 +464,7 @@
     }
 
     // Media & Voice Rendering
-    if (decoded.media) {
+    if (decoded.media && decoded.media.data) {
       const mediaWrap = document.createElement("div");
       mediaWrap.className = "chat-media-card";
 
@@ -482,7 +484,7 @@
       } else {
         const fileCard = document.createElement("a");
         fileCard.href = decoded.media.data;
-        fileCard.download = decoded.media.name || "document.pdf";
+        fileCard.download = decoded.media.name || "document";
         fileCard.className = "chat-file-card";
         fileCard.innerHTML = `
           <div class="chat-file-icon">
@@ -524,7 +526,6 @@
       flame.innerHTML = `<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path>`;
       metaRow.appendChild(flame);
 
-      // Self-destruct auto purge
       setTimeout(() => {
         article.classList.add("hidden");
         if (own) deleteMessage(message, true);
@@ -546,7 +547,6 @@
     const actions = document.createElement("div");
     actions.className = "message-actions";
 
-    // Emoji reaction button
     const reactBtn = document.createElement("button");
     reactBtn.className = "msg-action-btn";
     reactBtn.type = "button";
@@ -591,7 +591,6 @@
     }
 
     article.appendChild(actions);
-
     container.appendChild(article);
     container.scrollTop = container.scrollHeight;
   }
@@ -628,12 +627,41 @@
     setText("replyPreviewText", "");
   }
 
+  /* Safe Media Message Dispatcher */
+  async function sendMediaMessage(mediaObj) {
+    if (!state.room || !state.client) {
+      alert("Please join or create a room first.");
+      return;
+    }
+
+    try {
+      const payloadBody = encodeMessageBody("", state.replyTarget, mediaObj, state.activeBurnerTtl);
+
+      const { error } = await state.client.from("messages").insert({
+        room_id: state.room.id,
+        sender_id: state.senderId,
+        body: payloadBody
+      });
+
+      if (error) throw error;
+      cancelReply();
+    } catch (err) {
+      console.error("Media send error:", err);
+      alert("Attachment send failed: " + (err.message || "File too large or network error."));
+    }
+  }
+
+  /* Text Message Send Dispatcher */
   async function sendMessage(event) {
     event?.preventDefault();
     const input = $("messageInput");
     const text = input?.value.trim();
     if (!text || !state.room || !state.client) return;
-    if (text.length > CONFIG.MAX_MESSAGE_LENGTH) return;
+
+    if (text.length > CONFIG.MAX_MESSAGE_LENGTH) {
+      alert("Message exceeds maximum length of 2000 characters.");
+      return;
+    }
 
     const btn = $("sendBtn");
     if (btn) btn.disabled = true;
@@ -648,23 +676,11 @@
       input.value = "";
       toggleSendVoiceButtons();
       cancelReply();
-    } catch {} finally {
+    } catch (err) {
+      console.error("Send message error:", err);
+    } finally {
       if (btn) btn.disabled = false;
       input?.focus();
-    }
-  }
-
-  async function sendMediaMessage(mediaObj) {
-    if (!state.room || !state.client) return;
-    try {
-      await state.client.from("messages").insert({
-        room_id: state.room.id,
-        sender_id: state.senderId,
-        body: encodeMessageBody("", state.replyTarget, mediaObj, state.activeBurnerTtl)
-      });
-      cancelReply();
-    } catch (err) {
-      alert("Attachment send failed: " + (err.message || "Error"));
     }
   }
 
@@ -816,7 +832,7 @@
 
   function stopVoiceRecording(send = true) {
     if (!state.isRecordingVoice || !state.mediaRecorder) return;
-    if (!send) state.audioChunks = []; // clear to discard
+    if (!send) state.audioChunks = [];
     state.mediaRecorder.stop();
     state.isRecordingVoice = false;
 
@@ -1043,13 +1059,13 @@
 
     $("cancelVoiceBtn")?.addEventListener("click", () => stopVoiceRecording(false));
 
-    // File Attachments
+    // File Attachments (Size capped to 2MB for direct realtime base64 payload safety)
     $("attachmentBtn")?.addEventListener("click", () => $("attachmentInput")?.click());
     $("attachmentInput")?.addEventListener("change", e => {
       const file = e.target.files?.[0];
       if (!file) return;
-      if (file.size > 8 * 1024 * 1024) {
-        alert("Maximum attachment limit is 8MB.");
+      if (file.size > 2.5 * 1024 * 1024) {
+        alert("Maximum attachment limit is 2.5MB for instant websocket transfer.");
         e.target.value = "";
         return;
       }

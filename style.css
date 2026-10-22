@@ -418,28 +418,33 @@ html, body {
 }
 
 /* =========================================
-   TOP CHAT BAR (FIXED & EXPANDED HEADER)
+   TOP CHAT BAR (2-ROW NO-OVERLAP HEADER)
 ========================================= */
 
 .wa-chat-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 72px; /* Header ko spacious aur bada kiya */
-  padding: 12px 20px;
+  flex-direction: column; /* Row 1: Info, Row 2: Tools */
+  gap: 8px;
+  padding: 10px 16px;
   background: var(--chat-header);
   border-bottom: 1px solid var(--border);
   z-index: 20;
   box-sizing: border-box;
 }
 
+.wa-chat-header-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
 .wa-chat-avatar {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
   border-radius: 50%;
   background: var(--panel-card);
   border: 1px solid var(--border);
@@ -448,55 +453,55 @@ html, body {
 }
 
 .wa-chat-avatar svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 }
 
-/* Left Title & Room Code Area */
 .wa-chat-info {
-  flex: 1 1 auto;
+  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-  margin-right: 12px; /* Icons ke beech clear space */
+  gap: 2px;
 }
 
 .wa-chat-title-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
+  flex-wrap: nowrap;
 }
 
 .wa-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--text);
 }
 
 .wa-code-pill {
   display: inline-flex;
   align-items: center;
-  padding: 3px 8px;
-  border-radius: 6px;
+  padding: 2px 7px;
+  border-radius: 5px;
   background: rgba(124, 92, 255, 0.16);
   border: 1px dashed rgba(124, 92, 255, 0.5);
   color: var(--primary-light);
   font-family: ui-monospace, SFMono-Regular, monospace;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 1px;
+  letter-spacing: 0.8px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .wa-status-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--muted);
 }
 
@@ -509,45 +514,58 @@ html, body {
   align-items: center;
   gap: 4px;
   color: var(--text-secondary);
-  font-weight: 500;
 }
 
 .timer-tag svg {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
 }
 
-/* Right Action Tools (Icons container) */
+/* Action Tools (Row 2 - Clearly below title & code) */
 .wa-chat-tools {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0; /* Icons ko compress ya shift hone se rokega */
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.wa-chat-tools::-webkit-scrollbar {
+  display: none;
 }
 
 .wa-icon-btn {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  min-width: 38px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
   border-radius: 50%;
   border: none;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 140ms ease;
+  flex-shrink: 0;
 }
 
 .wa-icon-btn svg {
-  width: 19px;
-  height: 19px;
+  width: 17px;
+  height: 17px;
 }
 
 .wa-icon-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
-  transform: translateY(-1px);
+}
+
+.wa-icon-btn.active {
+  background: rgba(124, 92, 255, 0.2);
+  color: var(--primary-light);
 }
 
 .wa-icon-btn.danger:hover {
@@ -555,41 +573,59 @@ html, body {
   color: var(--danger);
 }
 
-/* Mobile Screen Par Layout Wrap na ho */
-@media (max-width: 768px) {
-  .wa-chat-header {
-    padding: 10px 14px;
-    min-height: 68px;
-    gap: 10px;
-  }
+/* BURNER DROPDOWN MENU */
+.wa-dropdown-wrap {
+  position: relative;
+}
 
-  .wa-chat-info {
-    margin-right: 6px;
-  }
+.wa-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 180px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: #151e33;
+  border: 1px solid var(--border);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.7);
+  z-index: 100;
+  animation: slideDown 150ms ease;
+}
 
-  .wa-title {
-    font-size: 14.5px;
-  }
+.dropdown-title {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  padding: 6px 8px 4px;
+}
 
-  .wa-code-pill {
-    font-size: 11px;
-    padding: 2px 6px;
-  }
+.dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease;
+}
 
-  .wa-chat-tools {
-    gap: 3px;
-  }
+.dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
 
-  .wa-icon-btn {
-    width: 34px;
-    height: 34px;
-    min-width: 34px;
-  }
-
-  .wa-icon-btn svg {
-    width: 17px;
-    height: 17px;
-  }
+.dropdown-item.active {
+  background: rgba(124, 92, 255, 0.15);
+  color: var(--primary-light);
+  font-weight: 600;
 }
 
 /* CALL PIP DOCK */
@@ -723,7 +759,7 @@ html, body {
 /* FEED & BUBBLES */
 .wa-messages-body {
   flex: 1;
-  padding: 16px 24px;
+  padding: 14px 16px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -1429,9 +1465,5 @@ html, body {
 
   .message {
     max-width: 86%;
-  }
-
-  .wa-messages-body {
-    padding: 14px 16px;
   }
 }

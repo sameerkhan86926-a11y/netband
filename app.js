@@ -27,7 +27,7 @@
     seen: new Set(),
     replyTarget: null,
     messages: new Map(),
-    reactions: new Map(), // messageId -> Map(emoji -> Set(senderIds))
+    reactions: new Map(),
     call: null,
     callConnecting: false,
     busy: false,
@@ -37,17 +37,18 @@
     notificationsEnabled: false,
     isScreenSharing: false,
     typingTimer: null,
-    activeBurnerTtl: 0, // 0 = off, else seconds
+    activeBurnerTtl: 0,
     activeReactionTargetId: null,
     // Voice Recorder State
     mediaRecorder: null,
     audioChunks: [],
     recordStartTime: 0,
     recordTimerInterval: null,
-    isRecordingVoice: false
+    isRecordingVoice: false,
+    audioStream: null
   };
 
-  /* Native Soft Tone Synthesizer */
+  /* Native Tone Synthesizer */
   function playNotificationSound() {
     if (!state.soundEnabled) return;
     try {
@@ -135,6 +136,7 @@
   }
 
   function formatDuration(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return "0:00";
     const sec = Math.max(0, Math.ceil(ms / 1000));
     const min = Math.floor(sec / 60);
     const rem = sec % 60;
@@ -368,8 +370,8 @@
     return svg;
   }
 
-  /* Audio Voice Player Component */
-  function createAudioPlayer(audioUrl) {
+  /* Robust Voice Note Audio Player */
+  function createAudioPlayer(audioUrl, recordedDurationMs = 0) {
     const bubble = document.createElement("div");
     bubble.className = "wa-audio-bubble";
 
@@ -389,25 +391,37 @@
 
     const durText = document.createElement("span");
     durText.className = "audio-duration";
-    durText.textContent = "0:00";
+    durText.textContent = recordedDurationMs > 0 ? formatDuration(recordedDurationMs) : "0:00";
 
     trackWrap.append(progBar, durText);
     bubble.append(playBtn, trackWrap);
 
-    const audio = new Audio(audioUrl);
+    const audio = new Audio();
+    audio.src = audioUrl;
+    audio.preload = "metadata";
+
+    let totalDuration = recordedDurationMs > 0 ? recordedDurationMs / 1000 : 0;
+
     audio.addEventListener("loadedmetadata", () => {
-      durText.textContent = formatDuration(audio.duration * 1000);
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        totalDuration = audio.duration;
+        durText.textContent = formatDuration(totalDuration * 1000);
+      }
     });
 
     audio.addEventListener("timeupdate", () => {
-      const pct = (audio.currentTime / (audio.duration || 1)) * 100;
-      progFill.style.width = `${pct}%`;
-      durText.textContent = formatDuration(audio.currentTime * 1000);
+      const dur = (Number.isFinite(audio.duration) && audio.duration > 0) ? audio.duration : totalDuration;
+      if (dur > 0) {
+        const pct = Math.min(100, (audio.currentTime / dur) * 100);
+        progFill.style.width = `${pct}%`;
+        durText.textContent = formatDuration(audio.currentTime * 1000);
+      }
     });
 
     audio.addEventListener("ended", () => {
       playBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
       progFill.style.width = "0%";
+      durText.textContent = formatDuration(totalDuration * 1000);
     });
 
     playBtn.onclick = () => {
@@ -415,8 +429,11 @@
         document.querySelectorAll("audio").forEach(a => {
           if (a !== audio) a.pause();
         });
-        audio.play().catch(() => {});
-        playBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+        audio.play().then(() => {
+          playBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+        }).catch(err => {
+          console.error("Playback error:", err);
+        });
       } else {
         audio.pause();
         playBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
@@ -469,7 +486,7 @@
       mediaWrap.className = "chat-media-card";
 
       if (decoded.media.type === "voice" || decoded.media.type === "audio") {
-        mediaWrap.appendChild(createAudioPlayer(decoded.media.data));
+        mediaWrap.appendChild(createAudioPlayer(decoded.media.data, decoded.media.duration || 0));
       } else if (decoded.media.type === "image") {
         const img = document.createElement("img");
         img.src = decoded.media.data;
@@ -783,37 +800,82 @@
     });
   }
 
-  /* WhatsApp Voice Note Recorder Implementation */
+  /* Cross-Browser WhatsApp Voice Note Recorder */
   async function startVoiceRecording() {
     if (state.isRecordingVoice) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      state.mediaRecorder = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true
+        }
+      });
+      state.audioStream = stream;
+
+      // Cross-browser format fallback (Chrome vs Safari/iOS)
+      let selectedMimeType = "";
+      if (typeof MediaRecorder.isTypeSupported === "function") {
+        if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+          selectedMimeType = "audio/webm;codecs=opus";
+        } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+          selectedMimeType = "audio/webm";
+        } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+          selectedMimeType = "audio/mp4";
+        } else if (MediaRecorder.isTypeSupported("audio/ogg")) {
+          selectedMimeType = "audio/ogg";
+        }
+      }
+
+      state.mediaRecorder = selectedMimeType
+        ? new MediaRecorder(stream, { mimeType: selectedMimeType })
+        : new MediaRecorder(stream);
+
       state.audioChunks = [];
 
       state.mediaRecorder.ondataavailable = e => {
-        if (e.data && e.data.size > 0) state.audioChunks.push(e.data);
+        if (e.data && e.data.size > 0) {
+          state.audioChunks.push(e.data);
+        }
       };
 
-      state.mediaRecorder.onstop = async () => {
+      state.mediaRecorder.onstop = () => {
         clearInterval(state.recordTimerInterval);
-        stream.getTracks().forEach(t => t.stop());
+        const recordedTimeMs = Math.max(1000, Date.now() - state.recordStartTime);
 
-        if (state.audioChunks.length === 0) return;
-        const audioBlob = new Blob(state.audioChunks, { type: "audio/webm" });
+        setTimeout(() => {
+          if (state.audioStream) {
+            state.audioStream.getTracks().forEach(t => t.stop());
+            state.audioStream = null;
+          }
+        }, 100);
+
+        if (state.audioChunks.length === 0) {
+          console.warn("No audio data chunks captured.");
+          return;
+        }
+
+        const mime = state.mediaRecorder.mimeType || selectedMimeType || "audio/webm";
+        const audioBlob = new Blob(state.audioChunks, { type: mime });
+
+        if (audioBlob.size < 200) {
+          console.warn("Audio recording empty.");
+          return;
+        }
 
         const reader = new FileReader();
         reader.onloadend = () => {
           sendMediaMessage({
             type: "voice",
             data: reader.result,
-            name: `voice_${Date.now()}.webm`
+            duration: recordedTimeMs,
+            name: `voice_${Date.now()}.${mime.includes("mp4") ? "mp4" : "webm"}`
           });
         };
         reader.readAsDataURL(audioBlob);
       };
 
-      state.mediaRecorder.start();
+      // 200ms timeslice ensures dataavailable fires continuously
+      state.mediaRecorder.start(200);
       state.isRecordingVoice = true;
       state.recordStartTime = Date.now();
 
@@ -825,15 +887,19 @@
         const elapsed = Date.now() - state.recordStartTime;
         setText("voiceRecordTimer", formatDuration(elapsed));
       }, 500);
-    } catch {
-      alert("Microphone permission denied for voice notes.");
+    } catch (err) {
+      console.error("Mic error:", err);
+      alert("Microphone permission allow karein.");
     }
   }
 
   function stopVoiceRecording(send = true) {
     if (!state.isRecordingVoice || !state.mediaRecorder) return;
     if (!send) state.audioChunks = [];
-    state.mediaRecorder.stop();
+    
+    if (state.mediaRecorder.state !== "inactive") {
+      state.mediaRecorder.stop();
+    }
     state.isRecordingVoice = false;
 
     $("voiceRecordingWave")?.classList.add("hidden");
@@ -1059,7 +1125,7 @@
 
     $("cancelVoiceBtn")?.addEventListener("click", () => stopVoiceRecording(false));
 
-    // File Attachments (Size capped to 2MB for direct realtime base64 payload safety)
+    // File Attachments
     $("attachmentBtn")?.addEventListener("click", () => $("attachmentInput")?.click());
     $("attachmentInput")?.addEventListener("change", e => {
       const file = e.target.files?.[0];

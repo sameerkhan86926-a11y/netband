@@ -113,39 +113,39 @@
 
       <!-- ACTIVE CHAT VIEWPORT -->
       <div class="wa-active-chat-view hidden" id="activeChatWrapper">
-
         <!-- HEADER -->
         <header class="wa-chat-header">
-          <button id="backToSidebarBtn" class="wa-icon-btn mobile-only" type="button" aria-label="Back">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-          </button>
+          <!-- ROW 1: Details -->
+          <div class="wa-chat-header-top">
+            <button id="backToSidebarBtn" class="wa-icon-btn mobile-only" type="button" aria-label="Back">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            </button>
 
-          <div class="wa-chat-avatar" id="roomAvatar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <div class="wa-chat-avatar" id="roomAvatar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </div>
+
+            <div class="wa-chat-info">
+              <div class="wa-chat-title-row">
+                <span class="wa-title" id="chatTitle">Temporary Space</span>
+                <span class="wa-code-pill" id="roomCodeDisplay">--------</span>
+              </div>
+              <div class="wa-status-row">
+                <span id="chatStatus">online</span>
+                <span class="bullet">·</span>
+                <span class="timer-tag">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  <span id="expiryTitle">30:00</span>
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div class="wa-chat-info">
-            <div class="wa-chat-title-row">
-              <span class="wa-title" id="chatTitle">Temporary Space</span>
-              <span class="wa-code-pill" id="roomCodeDisplay">--------</span>
-            </div>
-            <div class="wa-status-row">
-              <span id="chatStatus">online</span>
-              <span class="bullet">·</span>
-              <span class="timer-tag">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                <span id="expiryTitle">30:00</span>
-              </span>
-            </div>
-          </div>
-
-          <!-- TOP ACTION BUTTONS -->
+          <!-- ROW 2: All Icons (Neeche ki alag line mein) -->
           <div class="wa-chat-tools">
             <button id="notifyToggleBtn" class="wa-icon-btn" title="Push & Audio Notifications" type="button">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
             </button>
-
-            <!-- Disappearing Burner Menu -->
             <div class="wa-dropdown-wrap">
               <button id="burnerToggleBtn" class="wa-icon-btn" title="Self-Destruct Messages" type="button">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg>
@@ -158,7 +158,6 @@
                 <button type="button" data-ttl="900" class="dropdown-item">15 Minutes</button>
               </div>
             </div>
-
             <button id="joinVoiceBtn" class="wa-icon-btn" title="Voice Call" type="button">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
             </button>
@@ -180,6 +179,8 @@
           </div>
         </header>
 
+        
+              
         <!-- VIDEO CALL PIP OVERLAY -->
         <div id="callOverlay" class="wa-call-dock hidden">
           <div class="wa-call-dock-header">

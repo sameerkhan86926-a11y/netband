@@ -12,10 +12,9 @@
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="./favicon.ico" sizes="any">
-<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
-<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
-<link rel="apple-touch-icon" href="./apple-touch-icon.png">
-
+  <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
 </head>
 
 <body>
@@ -29,8 +28,8 @@
     <aside class="wa-sidebar" id="sidebarPanel">
       <header class="wa-sidebar-header">
         <div class="wa-avatar" id="myAvatar">
-  <img src="./apple-touch-icon.png" alt="NETBAND Logo">
-</div>
+          <img src="./apple-touch-icon.png" alt="NETBAND Logo">
+        </div>
         <div class="wa-sidebar-title">
           <h2>NETBAND</h2>
           <span class="wa-conn-status">
@@ -142,6 +141,24 @@
 
           <!-- TOP ACTION BUTTONS -->
           <div class="wa-chat-tools">
+            <button id="notifyToggleBtn" class="wa-icon-btn" title="Push & Audio Notifications" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            </button>
+
+            <!-- Disappearing Burner Menu -->
+            <div class="wa-dropdown-wrap">
+              <button id="burnerToggleBtn" class="wa-icon-btn" title="Self-Destruct Messages" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg>
+              </button>
+              <div id="burnerMenu" class="wa-dropdown-menu hidden">
+                <span class="dropdown-title">Self-Destruct Timer</span>
+                <button type="button" data-ttl="0" class="dropdown-item active">Off (Room Expiry)</button>
+                <button type="button" data-ttl="30" class="dropdown-item">30 Seconds</button>
+                <button type="button" data-ttl="300" class="dropdown-item">5 Minutes</button>
+                <button type="button" data-ttl="900" class="dropdown-item">15 Minutes</button>
+              </div>
+            </div>
+
             <button id="joinVoiceBtn" class="wa-icon-btn" title="Voice Call" type="button">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
             </button>
@@ -221,24 +238,42 @@
           </button>
         </div>
 
-        <!-- COMPOSER BAR -->
+        <!-- COMPOSER BAR & VOICE NOTE RECORDER -->
         <form id="messageForm" class="wa-composer-bar">
           <button id="attachmentBtn" class="wa-composer-btn" type="button" title="Attach file">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
           </button>
           
-          <div class="wa-input-pill">
+          <div class="wa-input-pill" id="inputPillWrapper">
             <input
               id="messageInput"
               type="text"
               maxlength="2000"
               placeholder="Type a message"
               autocomplete="off"
-              required
             >
+
+            <!-- Recording Wave Overlay inside pill -->
+            <div id="voiceRecordingWave" class="wa-voice-recording-overlay hidden">
+              <span class="rec-dot"></span>
+              <span id="voiceRecordTimer">0:00</span>
+              <div class="wave-bars">
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+            </div>
           </div>
 
-          <button id="sendBtn" class="wa-send-btn" type="submit" aria-label="Send">
+          <!-- Cancel Voice Record Button -->
+          <button id="cancelVoiceBtn" class="wa-composer-btn danger hidden" type="button" title="Cancel recording">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+
+          <!-- Voice Mic / Send Switch Button -->
+          <button id="voiceRecordBtn" class="wa-voice-btn" type="button" title="Record Voice Note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+          </button>
+
+          <button id="sendBtn" class="wa-send-btn hidden" type="submit" aria-label="Send">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
           </button>
         </form>
@@ -246,12 +281,32 @@
         <input
           id="attachmentInput"
           type="file"
-          accept="image/*,video/*,application/pdf"
+          accept="image/*,video/*,audio/*,application/pdf"
           hidden
         >
       </div>
     </main>
 
+  </div>
+
+  <!-- FLOATING EMOJI REACTION POPUP -->
+  <div id="emojiPickerPopup" class="wa-emoji-picker hidden">
+    <button type="button" data-emoji="👍">👍</button>
+    <button type="button" data-emoji="❤️">❤️</button>
+    <button type="button" data-emoji="😂">😂</button>
+    <button type="button" data-emoji="😮">😮</button>
+    <button type="button" data-emoji="😢">😢</button>
+    <button type="button" data-emoji="🙏">🙏</button>
+  </div>
+
+  <!-- MEDIA LIGHTBOX MODAL -->
+  <div id="mediaLightboxModal" class="modal-backdrop hidden">
+    <div class="lightbox-content">
+      <button id="closeLightboxBtn" class="lightbox-close" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+      <div id="lightboxMediaContainer"></div>
+    </div>
   </div>
 
   <!-- QR CODE MODAL POPUP -->

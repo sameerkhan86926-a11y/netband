@@ -119,16 +119,16 @@ html, body {
 }
 
 .wa-avatar {
-  width: 42px;
-  height: 42px;
-  min-width: 42px;
-  border-radius: 50%;
-  overflow: hidden;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: var(--radius-sm); /* 8px rounded corners, circle nahi banega */
+  background: transparent;          /* Safed background ki jagah transparent */
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
-  background: #ffffff;
+  padding: 2px;
+  overflow: visible;
 }
 
 .wa-avatar img {
@@ -136,8 +136,9 @@ html, body {
   height: 100%;
   object-fit: contain;
   display: block;
-  border-radius: 0;
+  filter: drop-shadow(0 2px 8px rgba(124, 92, 255, 0.35)); /* Subtle neon glow */
 }
+
 .wa-sidebar-title {
   flex: 1;
   display: flex;

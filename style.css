@@ -417,70 +417,87 @@ html, body {
   width: 100%;
 }
 
-/* TOP CHAT BAR */
+/* =========================================
+   TOP CHAT BAR (FIXED & EXPANDED HEADER)
+========================================= */
+
 .wa-chat-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 18px;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 72px; /* Header ko spacious aur bada kiya */
+  padding: 12px 20px;
   background: var(--chat-header);
   border-bottom: 1px solid var(--border);
-  z-index: 10;
+  z-index: 20;
+  box-sizing: border-box;
 }
 
 .wa-chat-avatar {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
   border-radius: 50%;
   background: var(--panel-card);
   border: 1px solid var(--border);
   color: var(--primary-light);
+  flex-shrink: 0;
 }
 
 .wa-chat-avatar svg {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
 }
 
+/* Left Title & Room Code Area */
 .wa-chat-info {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  margin-right: 12px; /* Icons ke beech clear space */
 }
 
 .wa-chat-title-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .wa-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--text);
 }
 
 .wa-code-pill {
-  padding: 2px 7px;
-  border-radius: 5px;
-  background: rgba(124, 92, 255, 0.15);
-  border: 1px dashed rgba(124, 92, 255, 0.4);
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(124, 92, 255, 0.16);
+  border: 1px dashed rgba(124, 92, 255, 0.5);
   color: var(--primary-light);
   font-family: ui-monospace, SFMono-Regular, monospace;
-  font-size: 11px;
-  letter-spacing: 0.5px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  white-space: nowrap;
 }
 
 .wa-status-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--muted);
-  margin-top: 1px;
 }
 
 .wa-status-row .bullet {
@@ -492,105 +509,87 @@ html, body {
   align-items: center;
   gap: 4px;
   color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .timer-tag svg {
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
 }
 
+/* Right Action Tools (Icons container) */
 .wa-chat-tools {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  flex-shrink: 0; /* Icons ko compress ya shift hone se rokega */
 }
 
 .wa-icon-btn {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
   border-radius: 50%;
   border: none;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.03);
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 140ms ease;
 }
 
 .wa-icon-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 19px;
+  height: 19px;
 }
 
 .wa-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
-}
-
-.wa-icon-btn.active {
-  background: rgba(124, 92, 255, 0.2);
-  color: var(--primary-light);
+  transform: translateY(-1px);
 }
 
 .wa-icon-btn.danger:hover {
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(239, 68, 68, 0.2);
   color: var(--danger);
 }
 
-/* BURNER DROPDOWN MENU */
-.wa-dropdown-wrap {
-  position: relative;
-}
+/* Mobile Screen Par Layout Wrap na ho */
+@media (max-width: 768px) {
+  .wa-chat-header {
+    padding: 10px 14px;
+    min-height: 68px;
+    gap: 10px;
+  }
 
-.wa-dropdown-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  width: 180px;
-  padding: 6px;
-  border-radius: var(--radius-sm);
-  background: var(--sidebar-bg);
-  border: 1px solid var(--border);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
-  z-index: 50;
-  animation: slideDown 150ms ease;
-}
+  .wa-chat-info {
+    margin-right: 6px;
+  }
 
-.dropdown-title {
-  display: block;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--muted);
-  padding: 6px 8px 4px;
-}
+  .wa-title {
+    font-size: 14.5px;
+  }
 
-.dropdown-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: var(--text);
-  font-size: 12.5px;
-  cursor: pointer;
-  text-align: left;
-  transition: background 120ms ease;
-}
+  .wa-code-pill {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
 
-.dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
+  .wa-chat-tools {
+    gap: 3px;
+  }
 
-.dropdown-item.active {
-  background: rgba(124, 92, 255, 0.15);
-  color: var(--primary-light);
-  font-weight: 600;
+  .wa-icon-btn {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+  }
+
+  .wa-icon-btn svg {
+    width: 17px;
+    height: 17px;
+  }
 }
 
 /* CALL PIP DOCK */

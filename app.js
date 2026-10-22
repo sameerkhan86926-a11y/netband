@@ -27,14 +27,24 @@
     seen: new Set(),
     replyTarget: null,
     messages: new Map(),
+    reactions: new Map(), // messageId -> Map(emoji -> Set(senderIds))
     call: null,
     callConnecting: false,
     busy: false,
     searchTerm: "",
     localTracks: [],
     soundEnabled: true,
+    notificationsEnabled: false,
     isScreenSharing: false,
-    typingTimer: null
+    typingTimer: null,
+    activeBurnerTtl: 0, // 0 = off, else seconds
+    activeReactionTargetId: null,
+    // Voice Recorder State
+    mediaRecorder: null,
+    audioChunks: [],
+    recordStartTime: 0,
+    recordTimerInterval: null,
+    isRecordingVoice: false
   };
 
   /* Native Soft Tone Synthesizer */
@@ -58,6 +68,16 @@
       osc.start();
       osc.stop(audioCtx.currentTime + 0.25);
     } catch {}
+  }
+
+  function triggerDesktopNotification(senderName, text) {
+    if (!state.notificationsEnabled || document.visibilityState === "visible") return;
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(`NETBAND · ${senderName}`, {
+        body: text.slice(0, 100),
+        icon: "./apple-touch-icon.png"
+      });
+    }
   }
 
   function getSenderId() {
@@ -123,17 +143,24 @@
 
   function decodeMessageBody(body) {
     const prefix = "__NETBAND_V2__:";
-    if (typeof body !== "string" || !body.startsWith(prefix)) return { text: body || "", replyTo: null };
+    if (typeof body !== "string" || !body.startsWith(prefix)) {
+      return { text: body || "", replyTo: null, media: null, burnerTtl: 0 };
+    }
     try {
       const data = JSON.parse(body.slice(prefix.length));
-      return { text: data.text || "", replyTo: data.replyTo || null };
+      return {
+        text: data.text || "",
+        replyTo: data.replyTo || null,
+        media: data.media || null,
+        burnerTtl: Number(data.burnerTtl || 0)
+      };
     } catch {
-      return { text: body, replyTo: null };
+      return { text: body, replyTo: null, media: null, burnerTtl: 0 };
     }
   }
 
-  function encodeMessageBody(text, replyTo = null) {
-    return "__NETBAND_V2__:" + JSON.stringify({ text, replyTo });
+  function encodeMessageBody(text, replyTo = null, media = null, burnerTtl = 0) {
+    return "__NETBAND_V2__:" + JSON.stringify({ text, replyTo, media, burnerTtl });
   }
 
   function setNetworkStatus() {
@@ -246,6 +273,7 @@
     state.roomCode = room.code;
     state.seen.clear();
     state.messages.clear();
+    state.reactions.clear();
 
     showChat(room);
     setText("chatStatus", "Connecting…");
@@ -274,6 +302,9 @@
             handleTypingIndicator(payload.payload?.senderName);
           }
         })
+        .on("broadcast", { event: "reaction" }, payload => {
+          handleIncomingReaction(payload.payload);
+        })
         .subscribe(status => {
           if (status === "SUBSCRIBED") setText("chatStatus", "online");
         });
@@ -301,6 +332,7 @@
 
   let lastTypingBroadcast = 0;
   function emitTyping() {
+    toggleSendVoiceButtons();
     if (!state.channel || !state.room) return;
     const now = Date.now();
     if (now - lastTypingBroadcast < 1000) return;
@@ -313,6 +345,17 @@
     });
   }
 
+  function toggleSendVoiceButtons() {
+    const hasText = Boolean($("messageInput")?.value.trim());
+    if (hasText) {
+      $("voiceRecordBtn")?.classList.add("hidden");
+      $("sendBtn")?.classList.remove("hidden");
+    } else {
+      $("sendBtn")?.classList.add("hidden");
+      $("voiceRecordBtn")?.classList.remove("hidden");
+    }
+  }
+
   /* WhatsApp SVG Double Tick */
   function createDoubleTickSvg() {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -323,6 +366,62 @@
       <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"/>
     `;
     return svg;
+  }
+
+  /* Audio Voice Player Component */
+  function createAudioPlayer(audioUrl) {
+    const bubble = document.createElement("div");
+    bubble.className = "wa-audio-bubble";
+
+    const playBtn = document.createElement("button");
+    playBtn.type = "button";
+    playBtn.className = "audio-play-btn";
+    playBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+
+    const trackWrap = document.createElement("div");
+    trackWrap.className = "audio-track-wrap";
+
+    const progBar = document.createElement("div");
+    progBar.className = "audio-progress-bar";
+    const progFill = document.createElement("div");
+    progFill.className = "audio-progress-fill";
+    progBar.appendChild(progFill);
+
+    const durText = document.createElement("span");
+    durText.className = "audio-duration";
+    durText.textContent = "0:00";
+
+    trackWrap.append(progBar, durText);
+    bubble.append(playBtn, trackWrap);
+
+    const audio = new Audio(audioUrl);
+    audio.addEventListener("loadedmetadata", () => {
+      durText.textContent = formatDuration(audio.duration * 1000);
+    });
+
+    audio.addEventListener("timeupdate", () => {
+      const pct = (audio.currentTime / (audio.duration || 1)) * 100;
+      progFill.style.width = `${pct}%`;
+      durText.textContent = formatDuration(audio.currentTime * 1000);
+    });
+
+    audio.addEventListener("ended", () => {
+      playBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+      progFill.style.width = "0%";
+    });
+
+    playBtn.onclick = () => {
+      if (audio.paused) {
+        document.querySelectorAll("audio").forEach(a => a !== audio && a.pause());
+        audio.play();
+        playBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+      } else {
+        audio.pause();
+        playBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+      }
+    };
+
+    return bubble;
   }
 
   function renderMessage(message, isNew = false) {
@@ -339,7 +438,10 @@
     const decoded = decodeMessageBody(message.body);
     const own = message.sender_id === state.senderId;
 
-    if (isNew && !own) playNotificationSound();
+    if (isNew && !own) {
+      playNotificationSound();
+      triggerDesktopNotification(`Guest-${String(message.sender_id).slice(0, 4)}`, decoded.text || "Sent a media attachment");
+    }
 
     const article = document.createElement("article");
     article.className = `message${own ? " own" : ""}`;
@@ -359,14 +461,75 @@
       article.appendChild(reply);
     }
 
-    const content = document.createElement("div");
-    content.className = "message-text";
-    content.textContent = message.deleted_at ? "This message was deleted." : decoded.text;
-    article.appendChild(content);
+    // Media & Voice Rendering
+    if (decoded.media) {
+      const mediaWrap = document.createElement("div");
+      mediaWrap.className = "chat-media-card";
 
-    // Meta (Time + SVG Double Tick)
+      if (decoded.media.type === "voice" || decoded.media.type === "audio") {
+        mediaWrap.appendChild(createAudioPlayer(decoded.media.data));
+      } else if (decoded.media.type === "image") {
+        const img = document.createElement("img");
+        img.src = decoded.media.data;
+        img.alt = "Attachment";
+        img.onclick = () => openLightbox("image", decoded.media.data);
+        mediaWrap.appendChild(img);
+      } else if (decoded.media.type === "video") {
+        const vid = document.createElement("video");
+        vid.src = decoded.media.data;
+        vid.controls = true;
+        mediaWrap.appendChild(vid);
+      } else {
+        const fileCard = document.createElement("a");
+        fileCard.href = decoded.media.data;
+        fileCard.download = decoded.media.name || "document.pdf";
+        fileCard.className = "chat-file-card";
+        fileCard.innerHTML = `
+          <div class="chat-file-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+          </div>
+          <div class="chat-file-meta">
+            <strong>${escapeHtml(decoded.media.name || "Attachment")}</strong>
+            <small>Download file</small>
+          </div>
+        `;
+        mediaWrap.appendChild(fileCard);
+      }
+      article.appendChild(mediaWrap);
+    }
+
+    if (decoded.text) {
+      const content = document.createElement("div");
+      content.className = "message-text";
+      content.textContent = message.deleted_at ? "This message was deleted." : decoded.text;
+      article.appendChild(content);
+    }
+
+    // Reactions container
+    const reactionsRow = document.createElement("div");
+    reactionsRow.className = "message-reactions-row";
+    article.appendChild(reactionsRow);
+
+    // Meta (Time + Flame Icon + SVG Double Tick)
     const metaRow = document.createElement("div");
     metaRow.className = "message-meta-row";
+
+    if (decoded.burnerTtl > 0 && !message.deleted_at) {
+      const flame = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      flame.setAttribute("viewBox", "0 0 24 24");
+      flame.setAttribute("class", "burner-icon");
+      flame.setAttribute("fill", "none");
+      flame.setAttribute("stroke", "currentColor");
+      flame.setAttribute("stroke-width", "2");
+      flame.innerHTML = `<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path>`;
+      metaRow.appendChild(flame);
+
+      // Self-destruct auto purge
+      setTimeout(() => {
+        article.classList.add("hidden");
+        if (own) deleteMessage(message, true);
+      }, decoded.burnerTtl * 1000);
+    }
 
     const time = document.createElement("span");
     time.className = "message-time";
@@ -383,6 +546,14 @@
     const actions = document.createElement("div");
     actions.className = "message-actions";
 
+    // Emoji reaction button
+    const reactBtn = document.createElement("button");
+    reactBtn.className = "msg-action-btn";
+    reactBtn.type = "button";
+    reactBtn.innerHTML = `<span>🙂</span> React`;
+    reactBtn.onclick = (e) => openEmojiPicker(e, id);
+    actions.appendChild(reactBtn);
+
     const replyBtn = document.createElement("button");
     replyBtn.className = "msg-action-btn";
     replyBtn.type = "button";
@@ -395,19 +566,21 @@
     copyBtn.type = "button";
     copyBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy`;
     copyBtn.onclick = async () => {
-      await navigator.clipboard.writeText(decoded.text);
+      await navigator.clipboard.writeText(decoded.text || decoded.media?.data || "");
       copyBtn.textContent = "Copied";
       setTimeout(() => (copyBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy`), 1200);
     };
     actions.appendChild(copyBtn);
 
     if (own && !message.deleted_at) {
-      const editBtn = document.createElement("button");
-      editBtn.className = "msg-action-btn";
-      editBtn.type = "button";
-      editBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg> Edit`;
-      editBtn.onclick = () => editMessage(message);
-      actions.appendChild(editBtn);
+      if (decoded.text) {
+        const editBtn = document.createElement("button");
+        editBtn.className = "msg-action-btn";
+        editBtn.type = "button";
+        editBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg> Edit`;
+        editBtn.onclick = () => editMessage(message);
+        actions.appendChild(editBtn);
+      }
 
       const delBtn = document.createElement("button");
       delBtn.className = "msg-action-btn";
@@ -445,7 +618,7 @@
     state.replyTarget = message.id;
     const decoded = decodeMessageBody(message.body);
     $("replyComposerPreview")?.classList.remove("hidden");
-    setText("replyPreviewText", decoded.text.slice(0, 80) || "Message");
+    setText("replyPreviewText", (decoded.text || decoded.media?.name || "Attachment").slice(0, 80));
     $("messageInput")?.focus();
   }
 
@@ -469,14 +642,29 @@
       const { error } = await state.client.from("messages").insert({
         room_id: state.room.id,
         sender_id: state.senderId,
-        body: encodeMessageBody(text, state.replyTarget)
+        body: encodeMessageBody(text, state.replyTarget, null, state.activeBurnerTtl)
       });
       if (error) throw error;
       input.value = "";
+      toggleSendVoiceButtons();
       cancelReply();
     } catch {} finally {
       if (btn) btn.disabled = false;
       input?.focus();
+    }
+  }
+
+  async function sendMediaMessage(mediaObj) {
+    if (!state.room || !state.client) return;
+    try {
+      await state.client.from("messages").insert({
+        room_id: state.room.id,
+        sender_id: state.senderId,
+        body: encodeMessageBody("", state.replyTarget, mediaObj, state.activeBurnerTtl)
+      });
+      cancelReply();
+    } catch (err) {
+      alert("Attachment send failed: " + (err.message || "Error"));
     }
   }
 
@@ -491,13 +679,14 @@
     try {
       await state.client
         .from("messages")
-        .update({ body: encodeMessageBody(text, decoded.replyTo), edited_at: new Date().toISOString() })
+        .update({ body: encodeMessageBody(text, decoded.replyTo, decoded.media, decoded.burnerTtl), edited_at: new Date().toISOString() })
         .eq("id", message.id);
     } catch {}
   }
 
-  async function deleteMessage(message) {
-    if (message.sender_id !== state.senderId || !confirm("Delete this message?")) return;
+  async function deleteMessage(message, silent = false) {
+    if (message.sender_id !== state.senderId) return;
+    if (!silent && !confirm("Delete this message?")) return;
     try {
       await state.client
         .from("messages")
@@ -506,6 +695,152 @@
     } catch {}
   }
 
+  /* WhatsApp Floating Emoji Reactions */
+  function openEmojiPicker(event, messageId) {
+    event.stopPropagation();
+    state.activeReactionTargetId = messageId;
+    const popup = $("emojiPickerPopup");
+    if (!popup) return;
+
+    const rect = event.target.getBoundingClientRect();
+    popup.style.top = `${rect.top - 46}px`;
+    popup.style.left = `${Math.min(window.innerWidth - 240, rect.left)}px`;
+    popup.classList.remove("hidden");
+  }
+
+  function handleEmojiSelect(emoji) {
+    if (!state.activeReactionTargetId || !state.channel) return;
+    const targetId = state.activeReactionTargetId;
+
+    const payload = {
+      messageId: targetId,
+      emoji,
+      senderId: state.senderId
+    };
+
+    handleIncomingReaction(payload);
+
+    state.channel.send({
+      type: "broadcast",
+      event: "reaction",
+      payload
+    });
+
+    $("emojiPickerPopup")?.classList.add("hidden");
+  }
+
+  function handleIncomingReaction({ messageId, emoji, senderId }) {
+    if (!state.reactions.has(messageId)) {
+      state.reactions.set(messageId, new Map());
+    }
+    const msgReactions = state.reactions.get(messageId);
+    if (!msgReactions.has(emoji)) {
+      msgReactions.set(emoji, new Set());
+    }
+
+    const set = msgReactions.get(emoji);
+    if (set.has(senderId)) {
+      set.delete(senderId);
+      if (set.size === 0) msgReactions.delete(emoji);
+    } else {
+      set.add(senderId);
+    }
+
+    renderReactions(messageId);
+  }
+
+  function renderReactions(messageId) {
+    const msgEl = document.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+    if (!msgEl) return;
+    const row = msgEl.querySelector(".message-reactions-row");
+    if (!row) return;
+
+    row.replaceChildren();
+    const map = state.reactions.get(messageId);
+    if (!map || map.size === 0) return;
+
+    map.forEach((set, emoji) => {
+      const pill = document.createElement("span");
+      pill.className = "reaction-pill";
+      pill.innerHTML = `<span>${emoji}</span> <span class="reaction-count">${set.size}</span>`;
+      row.appendChild(pill);
+    });
+  }
+
+  /* WhatsApp Voice Note Recorder Implementation */
+  async function startVoiceRecording() {
+    if (state.isRecordingVoice) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      state.mediaRecorder = new MediaRecorder(stream);
+      state.audioChunks = [];
+
+      state.mediaRecorder.ondataavailable = e => {
+        if (e.data && e.data.size > 0) state.audioChunks.push(e.data);
+      };
+
+      state.mediaRecorder.onstop = async () => {
+        clearInterval(state.recordTimerInterval);
+        stream.getTracks().forEach(t => t.stop());
+
+        if (state.audioChunks.length === 0) return;
+        const audioBlob = new Blob(state.audioChunks, { type: "audio/webm" });
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          sendMediaMessage({
+            type: "voice",
+            data: reader.result,
+            name: `voice_${Date.now()}.webm`
+          });
+        };
+        reader.readAsDataURL(audioBlob);
+      };
+
+      state.mediaRecorder.start();
+      state.isRecordingVoice = true;
+      state.recordStartTime = Date.now();
+
+      $("voiceRecordingWave")?.classList.remove("hidden");
+      $("voiceRecordBtn")?.classList.add("recording");
+      $("cancelVoiceBtn")?.classList.remove("hidden");
+
+      state.recordTimerInterval = setInterval(() => {
+        const elapsed = Date.now() - state.recordStartTime;
+        setText("voiceRecordTimer", formatDuration(elapsed));
+      }, 500);
+    } catch {
+      alert("Microphone permission denied for voice notes.");
+    }
+  }
+
+  function stopVoiceRecording(send = true) {
+    if (!state.isRecordingVoice || !state.mediaRecorder) return;
+    if (!send) state.audioChunks = []; // clear to discard
+    state.mediaRecorder.stop();
+    state.isRecordingVoice = false;
+
+    $("voiceRecordingWave")?.classList.add("hidden");
+    $("voiceRecordBtn")?.classList.remove("recording");
+    $("cancelVoiceBtn")?.classList.add("hidden");
+    setText("voiceRecordTimer", "0:00");
+  }
+
+  /* Media Lightbox Viewer */
+  function openLightbox(type, src) {
+    const container = $("lightboxMediaContainer");
+    if (!container) return;
+    container.replaceChildren();
+
+    if (type === "image") {
+      const img = document.createElement("img");
+      img.src = src;
+      container.appendChild(img);
+    }
+    $("mediaLightboxModal")?.classList.remove("hidden");
+  }
+
+  /* QR Code & Share */
   function showQrCode() {
     if (!state.roomCode) return;
     const url = new URL(location.href);
@@ -532,6 +867,12 @@
       const txt = el.querySelector(".message-text")?.textContent || "";
       el.classList.toggle("hidden", !txt.toLowerCase().includes(state.searchTerm));
     });
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, c => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[c]);
   }
 
   /* LiveKit Video & Audio Streaming */
@@ -647,7 +988,7 @@
     try {
       state.isScreenSharing = !state.isScreenSharing;
       await state.call.localParticipant.setScreenShareEnabled(state.isScreenSharing);
-      $("screenShareBtn")?.classList.toggle("danger", state.isScreenSharing);
+      $("screenShareBtn")?.classList.toggle("active", state.isScreenSharing);
     } catch {
       state.isScreenSharing = false;
     }
@@ -694,6 +1035,81 @@
     $("messageForm")?.addEventListener("submit", sendMessage);
     $("messageInput")?.addEventListener("input", emitTyping);
 
+    // Voice Recorder Buttons
+    $("voiceRecordBtn")?.addEventListener("click", () => {
+      if (!state.isRecordingVoice) startVoiceRecording();
+      else stopVoiceRecording(true);
+    });
+
+    $("cancelVoiceBtn")?.addEventListener("click", () => stopVoiceRecording(false));
+
+    // File Attachments
+    $("attachmentBtn")?.addEventListener("click", () => $("attachmentInput")?.click());
+    $("attachmentInput")?.addEventListener("change", e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > 8 * 1024 * 1024) {
+        alert("Maximum attachment limit is 8MB.");
+        e.target.value = "";
+        return;
+      }
+
+      const reader = new FileReader();
+      const isImg = file.type.startsWith("image/");
+      const isVid = file.type.startsWith("video/");
+
+      reader.onloadend = () => {
+        sendMediaMessage({
+          type: isImg ? "image" : isVid ? "video" : "file",
+          data: reader.result,
+          name: file.name
+        });
+      };
+      reader.readAsDataURL(file);
+      e.target.value = "";
+    });
+
+    // Burner Self-Destruct Dropdown
+    $("burnerToggleBtn")?.addEventListener("click", e => {
+      e.stopPropagation();
+      $("burnerMenu")?.classList.toggle("hidden");
+    });
+
+    document.querySelectorAll(".dropdown-item").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".dropdown-item").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.activeBurnerTtl = Number(btn.dataset.ttl || 0);
+        $("burnerToggleBtn")?.classList.toggle("active", state.activeBurnerTtl > 0);
+        $("burnerMenu")?.classList.add("hidden");
+      });
+    });
+
+    // Desktop Push Notification Toggle
+    $("notifyToggleBtn")?.addEventListener("click", async () => {
+      if ("Notification" in window) {
+        const perm = await Notification.requestPermission();
+        state.notificationsEnabled = perm === "granted";
+        $("notifyToggleBtn")?.classList.toggle("active", state.notificationsEnabled);
+        alert(state.notificationsEnabled ? "Desktop Notifications Enabled." : "Notifications denied.");
+      }
+    });
+
+    // Floating Emoji Bar clicks
+    document.querySelectorAll("#emojiPickerPopup button").forEach(b => {
+      b.addEventListener("click", () => handleEmojiSelect(b.dataset.emoji));
+    });
+
+    document.addEventListener("click", e => {
+      if (!e.target.closest("#emojiPickerPopup") && !e.target.closest(".msg-action-btn")) {
+        $("emojiPickerPopup")?.classList.add("hidden");
+      }
+      if (!e.target.closest(".wa-dropdown-wrap")) {
+        $("burnerMenu")?.classList.add("hidden");
+      }
+    });
+
+    $("closeLightboxBtn")?.addEventListener("click", () => $("mediaLightboxModal")?.classList.add("hidden"));
     $("cancelReplyBtn")?.addEventListener("click", cancelReply);
     $("showQrBtn")?.addEventListener("click", showQrCode);
     $("closeQrBtn")?.addEventListener("click", () => $("qrModal")?.classList.add("hidden"));
@@ -721,7 +1137,6 @@
     setNetworkStatus();
     setupEventListeners();
 
-    
     const params = new URLSearchParams(location.search);
     const code = params.get("room");
     if (code) {

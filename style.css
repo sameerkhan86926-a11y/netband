@@ -1,6 +1,6 @@
 /* =========================================
    NETBAND — PROFESSIONAL WHATSAPP DARK UI
-   File: style.css
+   File: style.css (Production Complete)
 ========================================= */
 
 :root {
@@ -122,8 +122,8 @@ html, body {
   width: 40px;
   height: 40px;
   min-width: 40px;
-  border-radius: var(--radius-sm); /* 8px rounded corners, circle nahi banega */
-  background: transparent;          /* Safed background ki jagah transparent */
+  border-radius: var(--radius-sm);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -136,7 +136,7 @@ html, body {
   height: 100%;
   object-fit: contain;
   display: block;
-  filter: drop-shadow(0 2px 8px rgba(124, 92, 255, 0.35)); /* Subtle neon glow */
+  filter: drop-shadow(0 2px 8px rgba(124, 92, 255, 0.35));
 }
 
 .wa-sidebar-title {
@@ -528,9 +528,69 @@ html, body {
   color: #fff;
 }
 
+.wa-icon-btn.active {
+  background: rgba(124, 92, 255, 0.2);
+  color: var(--primary-light);
+}
+
 .wa-icon-btn.danger:hover {
   background: rgba(239, 68, 68, 0.15);
   color: var(--danger);
+}
+
+/* BURNER DROPDOWN MENU */
+.wa-dropdown-wrap {
+  position: relative;
+}
+
+.wa-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 180px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+  z-index: 50;
+  animation: slideDown 150ms ease;
+}
+
+.dropdown-title {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  padding: 6px 8px 4px;
+}
+
+.dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease;
+}
+
+.dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dropdown-item.active {
+  background: rgba(124, 92, 255, 0.15);
+  color: var(--primary-light);
+  font-weight: 600;
 }
 
 /* CALL PIP DOCK */
@@ -668,7 +728,7 @@ html, body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   background:
     radial-gradient(ellipse at 50% 0%, rgba(20, 30, 52, 0.35), transparent 70%),
     var(--chat-bg);
@@ -746,14 +806,165 @@ html, body {
   white-space: pre-wrap;
 }
 
+/* MEDIA & FILE ATTACHMENT CARDS INSIDE BUBBLE */
+.chat-media-card {
+  margin: 4px 0 6px;
+  border-radius: 6px;
+  overflow: hidden;
+  max-width: 320px;
+}
+
+.chat-media-card img,
+.chat-media-card video {
+  display: block;
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 140ms ease;
+}
+
+.chat-media-card img:hover {
+  transform: scale(1.02);
+}
+
+.chat-file-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.chat-file-icon svg {
+  width: 24px;
+  height: 24px;
+  color: var(--primary-light);
+}
+
+.chat-file-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-file-meta strong {
+  display: block;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-file-meta small {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* VOICE NOTE BUBBLE (AUDIO PLAYER) */
+.wa-audio-bubble {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  margin: 4px 0;
+  min-width: 220px;
+}
+
+.audio-play-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.audio-play-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.audio-track-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.audio-progress-bar {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+  position: relative;
+}
+
+.audio-progress-fill {
+  width: 0%;
+  height: 100%;
+  background: var(--primary-light);
+}
+
+.audio-duration {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* REACTIONS ATTACHED TO MESSAGE */
+.message-reactions-row {
+  position: absolute;
+  bottom: -10px;
+  right: 12px;
+  display: flex;
+  gap: 3px;
+  z-index: 2;
+}
+
+.reaction-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: 10px;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.reaction-count {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* META ROW (Time + Burner Icon + Double Tick) */
 .message-meta-row {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
-  margin-top: 2px;
+  margin-top: 3px;
   float: right;
   margin-left: 8px;
+}
+
+.burner-icon {
+  width: 12px;
+  height: 12px;
+  color: #fb923c;
 }
 
 .message-time {
@@ -809,6 +1020,39 @@ html, body {
   font-size: 11.5px;
   margin-bottom: 4px;
   color: var(--primary-light);
+}
+
+/* FLOATING EMOJI PICKER POPUP */
+.wa-emoji-picker {
+  position: absolute;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  border-radius: 24px;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  animation: popIn 140ms ease;
+}
+
+.wa-emoji-picker button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+
+.wa-emoji-picker button:hover {
+  transform: scale(1.25);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 /* TYPING INDICATOR */
@@ -872,7 +1116,7 @@ html, body {
   height: 15px;
 }
 
-/* COMPOSER */
+/* COMPOSER BAR & VOICE RECORDER */
 .wa-composer-bar {
   display: flex;
   align-items: center;
@@ -880,6 +1124,7 @@ html, body {
   padding: 10px 18px calc(10px + env(safe-area-inset-bottom));
   background: var(--sidebar-bg);
   border-top: 1px solid var(--border);
+  position: relative;
 }
 
 .wa-composer-btn {
@@ -903,7 +1148,16 @@ html, body {
   color: #fff;
 }
 
+.wa-composer-btn.danger {
+  color: var(--danger);
+}
+
+.wa-composer-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
 .wa-input-pill {
+  position: relative;
   flex: 1;
   display: flex;
   align-items: center;
@@ -923,6 +1177,61 @@ html, body {
   font-size: 14px;
 }
 
+/* VOICE RECORDING WAVE OVERLAY */
+.wa-voice-recording-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  background: rgba(14, 21, 36, 0.95);
+  border-radius: 22px;
+}
+
+.rec-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: pulseAnim 1s infinite;
+}
+
+#voiceRecordTimer {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+  font-family: monospace;
+}
+
+.wave-bars {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+}
+
+.wave-bars span {
+  display: inline-block;
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--primary-light);
+  animation: waveMotion 1s infinite ease-in-out;
+}
+
+.wave-bars span:nth-child(2) { animation-delay: 0.15s; height: 18px; }
+.wave-bars span:nth-child(3) { animation-delay: 0.3s; height: 24px; }
+.wave-bars span:nth-child(4) { animation-delay: 0.45s; height: 16px; }
+.wave-bars span:nth-child(5) { animation-delay: 0.6s; height: 10px; }
+
+@keyframes waveMotion {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1.2); }
+}
+
+/* VOICE MIC & SEND SWITCH */
+.wa-voice-btn,
 .wa-send-btn {
   display: grid;
   place-items: center;
@@ -930,10 +1239,29 @@ html, body {
   height: 42px;
   border-radius: 50%;
   border: none;
-  background: var(--primary);
   color: #fff;
   cursor: pointer;
-  transition: transform 120ms ease;
+  transition: transform 120ms ease, background 140ms ease;
+  flex-shrink: 0;
+}
+
+.wa-voice-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.wa-voice-btn.recording {
+  background: var(--danger);
+  animation: pulseAnim 1.4s infinite;
+}
+
+.wa-voice-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.wa-send-btn {
+  background: var(--primary);
 }
 
 .wa-send-btn svg {
@@ -942,8 +1270,47 @@ html, body {
   margin-left: 2px;
 }
 
+.wa-voice-btn:active,
 .wa-send-btn:active {
   transform: scale(0.92);
+}
+
+/* MEDIA LIGHTBOX MODAL */
+.lightbox-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightbox-content img,
+.lightbox-content video {
+  max-width: 100%;
+  max-height: 80vh;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8);
+}
+
+.lightbox-close {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.lightbox-close svg {
+  width: 18px;
+  height: 18px;
 }
 
 /* MODAL */
@@ -1063,5 +1430,9 @@ html, body {
 
   .message {
     max-width: 86%;
+  }
+
+  .wa-messages-body {
+    padding: 14px 16px;
   }
 }
